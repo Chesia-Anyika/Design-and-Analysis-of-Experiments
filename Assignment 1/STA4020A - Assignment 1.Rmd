@@ -1,0 +1,626 @@
+---
+title: "STA4020A - Assignment 1"
+author: "Chesia Anyika"
+date: "2024-05-15"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question
+
+Consider the following two sets of data:
+
+1)  Write the hypothesis to be tested
+
+2)  Calculate the correction factor, Total SS, Treatment SS and Error SS
+
+3)  Generate the ANOVA table
+
+4)  At 5% and 10% levels of significance, test the hypothesis and make conclusions
+
+# Case 1: Equal Replications
+
+|                 | Treatment A | Treatment B | Treatment C |
+|-----------------|-------------|-------------|-------------|
+| **Replicate 1** | 23          | 42          | 47          |
+| **Replicate 2** | 36          | 26          | 43          |
+| **Replicate 3** | 31          | 47          | 43          |
+| **Replicate 4** | 33          | 34          | 39          |
+
+## 1. Write the Hypothesis to be Tested
+
+The **Null hypothesis** is that all the means are equal, which is represented mathematically as: $H_0 : \mu_1 = \mu_2 = \mu_3$
+
+The **Alternative hypothesis** is that at east one of the means is different from the other means, which is represented mathematically as either of the three:
+
+$$
+H_0 : \mu_1 = \mu_2 \neq \mu_3\\
+H_0 : \mu_1 \neq \mu_2 = \mu_3\\
+H_0 : \mu_1 \neq \mu_2 \neq \mu_3
+$$
+
+## 2. Calculate the correction factor, Total SS, Treatment SS and Error SS
+
+### **Step 1: Input the table in r**
+
+```{r}
+#create vectors
+Replicate <- c('Replicate 1', 'Replicate 2', 'Replicate 3', 'Replicate 4')
+Treatment_A <- c(23, 36, 31, 33)
+Treatment_B <- c(42, 26, 47, 34)
+Treatment_C <- c(47, 43, 43, 39)
+
+#create table
+case1 <- data.frame(Replicate, Treatment_A, Treatment_B, Treatment_C)
+
+#View
+case1
+```
+
+I then computed the row-wise sums as $Y_i$, and added these to the table.
+
+```{r}
+#compute rowsums
+Sums <- c('Y_i', sum(case1$Treatment_A), sum(case1$Treatment_B), sum(case1$Treatment_C))
+
+#rbind to table
+case1 <- rbind(case1, Sums)
+
+#View
+case1
+```
+
+### Step 2: Correction factor
+
+The correction factor is computed as per the formula:
+
+$$
+CF = \frac{Y..^2}{rt}
+$$
+
+> Where:
+>
+> $Y..$ is the sum of the row sums.
+>
+> $r$ is the number of replicates.
+>
+> $t$ is the number of treatments.
+
+I first defined my parameters $r$ and $t$, and computed $Y..$ , the sum of the row sums, as follows:
+
+```{r}
+#define parameters
+r <- 4
+t <- 3
+
+#compute the sum
+Ydot <- 123 + 149 + 172
+
+#View Result
+cat('Y.. = ', Ydot)
+```
+
+I then computed the formula:
+
+```{r}
+#Formula
+CF <- ((Ydot)^2/(r*t))
+
+#View
+CF
+```
+
+The **Correction Factor** is $16,428$
+
+### Step 3: Total SS
+
+Total SS is computed as per the formula:
+
+$$
+TotalSS = \sum Y^2_{ij} - CF
+$$
+
+To compute $\sum Y^2_{ij}$, I computed the individual squares of each element and summed them up
+
+```{r}
+#compute individual squares
+TA.sq <- Treatment_A^2
+TB.sq <- Treatment_B^2
+TC.sq <- Treatment_C^2
+
+#sum all the squares
+Y2sum <- sum(TA.sq, TB.sq, TC.sq)
+
+#View the result
+Y2sum
+```
+
+I then computed the TotalSS as per the formula:
+
+```{r}
+#compute TotalSS
+TotalSS <- Y2sum - CF
+
+#View results
+TotalSS
+```
+
+The **TotalSS** is $680$.
+
+### Step 4: Treatment SS
+
+The **Treatment SS (TRT SS)** is computed as per the formula:
+
+$$
+ TRTSS = \sum \frac{Y^2_i}{r} - CF
+$$
+
+I computed this as per the formula, as follows
+
+```{r}
+#compute the TRTSS
+Yi <- c(123, 149, 172)
+TRTSS <- sum((Yi^2)/r)-CF
+
+#View the result
+TRTSS
+```
+
+The **Treatment SS** **(TRTSS)** is $300.5$.
+
+### Step 5: Error SS
+
+The **Error SS** is computed as per the formula:
+
+$$
+ErrorSS = TotalSS - TRTSS
+$$
+
+I computed this as follows:
+
+```{r}
+#compute the formula
+ErrorSS <- TotalSS - TRTSS
+
+#View the result
+ErrorSS
+```
+
+The **ErrorSS** is $379.5$.
+
+## 3. Generate the ANOVA table
+
+The Anova table requires **Degrees of Freedom**, the **Sum of Squares(Total, Treatment, Error)**, the **Mean Squares** and the **F-Statistic**.
+
+First I computed the degrees of freedom, as per the formulas:
+
+$$
+DF_{trt} = t - 1\\
+DF_{err} = t \times (r - 1)\\
+DF_{total} = \frac{DF_{trt}}{DF_{err}} 
+$$
+
+> Where:
+>
+> $DF_{trt}$ is the **Treatment Degrees of Freedom**
+>
+> $DF_{err}$ is the **Error Degrees of Freedom**
+>
+> $DF_{total}$ is the **Total Degrees of Freedom**.
+
+```{r}
+# Compute degrees of freedom
+Df_trt <- t - 1
+Df_err <- t * (r - 1)
+Df_tot <- Df_trt + Df_err
+
+#View results
+cat('\n Treatment Df: ', Df_trt, '\n Error Df: ', Df_err, '\n Total Df: ', Df_tot)
+```
+
+I then computed the Mean Squares (MS), as per the formulas:
+
+$$
+MS_{trt} = \frac{SS_{trt}}{DF_{trt}}\\
+MS_{err} = \frac{SS_{err}}{DF_{err}}
+$$
+
+> Where:
+>
+> $MS_{trt}$ is the **Treatment Mean Squares.**
+>
+> $MS_{err}$ is the **Error Mean Squares**.
+
+This is computed as follows:
+
+```{r}
+# Compute Mean Square (MS)
+MS_trt <- TRTSS / Df_trt
+MS_err <- ErrorSS / Df_err
+
+#View results
+cat('\n Treatment MS: ', MS_trt, '\n Error MS: ', MS_err)
+```
+
+I then computed the F-statistic as per the formula:
+
+$$
+F_{value} = \frac{MS_{trt}}{MS_{err}}
+$$
+
+This is computed as follows:
+
+```{r}
+# Compute F-value for Treatment
+F_value <- MS_trt / MS_err
+
+#View results
+cat('F value: ', F_value)
+```
+
+I then input all the values into a data-frame, to create the anova table as follows:
+
+```{r}
+# Create ANOVA table
+anova_table <- data.frame(
+  Sources_of_Variation = c("Treatment", "Error", "Total"),
+  Df = c(Df_trt, Df_err, Df_tot),
+  SS = c(TRTSS, ErrorSS, TotalSS),
+  MS = c(MS_trt, MS_err, NA),  # MS for Total is not applicable
+  F = c(F_value, NA, NA)  # F for Error and Total is not applicable
+)
+
+# Print ANOVA table
+print(anova_table, row.names = FALSE)
+
+```
+
+## 4. At 5% and 10% levels of significance, test the hypothesis and make conclusions
+
+First, I defined my degrees of freedom.
+
+```{r}
+# Degrees of freedom for critical F-value
+Df1 <- Df_trt
+Df2 <- Df_err
+```
+
+### Step 1: At 5% Significance
+
+I used the `qf()` function to obtain the Critical F value at a 5% level of significance. I then compared the obtained F-statistic to the F_value, to make conclusions on the null hypothesis.
+
+```{r}
+# Critical F-value at 5% significance level
+critical_F_5 <- qf(0.95, Df1, Df2)
+
+# Test hypothesis at 5% significance level
+if (F_value > critical_F_5) {
+  cat("\n F_value: ", F_value, "\n Critical Value: ", critical_F_5, "\n ", "\n Null hupothesis rejected")
+} else {
+  cat("\n F_value: ", F_value, "\n Critical Value: ", critical_F_5, "\n ", "\n Fail to reject null hypothesis")
+}
+```
+
+The F-value (3.56) is **less than** the critical value (4.26), thus at a 95% confidence level we fail to reject the null hypothesis stated as follows: $H_0: \mu_1 = \mu_2 = \mu_3$. Thus, there are no significant differences among the means.
+
+### Step 2: At 10% Significance
+
+I repeated the procedure at 10% significance level.
+
+```{r}
+# Critical F-value at 10% significance level
+critical_F_10 <- qf(0.90, Df1, Df2)
+
+# Test hypothesis at 10% significance level
+if (F_value > critical_F_10) {
+  cat("\n F_value: ", F_value, "\n Critical Value: ", critical_F_10, "\n ", "\n Null hupothesis rejected")
+} else {
+  cat("\n F_value: ", F_value, "\n Critical Value: ", critical_F_5, "\n ", "\n Fail to reject null hypothesis")
+}
+```
+
+The F_value (3.56) is **greater than** the Critical value (3.01), thus at a 90% confidence level we reject the null hypothesis stated as $H_0: \mu_1 = \mu_2 = \mu_3$. Thus, there is at least one statistically significant difference among the means.
+
+# Case 2: Unequal Replications
+
+|                 | Treatment A | Treatment B | Treatment C | Treatment D |
+|-----------------|-------------|-------------|-------------|-------------|
+| **Replicate 1** | 2.0         | 1.7         | 2.0         | 2.1         |
+| **Replicate 2** | 2.2         | 1.9         | 2.4         | 2.2         |
+| **Replicate 3** | 1.8         | 1.5         | 2.7         | 2.2         |
+| **Replicate 4** | 2.3         |             | 2.5         | 1.9         |
+| **Replicate 5** | 1.7         |             | 2.4         |             |
+
+## 1. Write the Hypothesis to be Tested
+
+The **Null hypothesis** is that all the means are equal, which is represented mathematically as: $H_0 : \mu_1 = \mu_2 = \mu_3 = \mu_4$
+
+The **Alternative hypothesis** is that at east one of the means is different from the other means, which is represented mathematically as follows:
+
+$$
+H_0 : \mu_1 \neq \mu_2 \neq \mu_3 \neq \mu_4
+$$
+
+## 2. Calculate the correction factor, Total SS, Treatment SS and Error SS
+
+### Step 1: Input the Table
+
+First I created the above table as follows:
+
+```{r}
+#Input the values
+replicates <- c('Replicate 1', 'Replicate 2', 'Replicate 3', 'Replicate 4', 'Replicate 5')
+treatment_A <- c(2.0, 2.2, 1.8, 2.3, 1.7)
+treatment_B <- c(1.7, 1.9, 1.5, NA, NA)
+treatment_C <- c(2.0, 2.4, 2.7, 2.5, 2.4)
+treatment_D <- c(2.1, 2.2, 2.2, 1.9, NA)
+
+#create table
+case2 <- data.frame(replicates, treatment_A,treatment_B, treatment_C, treatment_D)
+
+#View
+case2
+```
+
+I then computed $Y_i$, the row sums, as follows.
+
+```{r}
+#compute rowsums
+sums <- c('Y_i', sum(case2$treatment_A), sum(1.7, 1.9, 1.5), sum(case2$treatment_C), sum(2.1, 2.2, 2.2, 1.9))
+
+#rbind to table
+case2 <- rbind(case2, sums)
+
+#View
+case2
+```
+
+### Step 2: Correction Factor
+
+The correction factor is computed as per the formula:
+
+$$
+ CF = \frac{Y..^2}{\sum r_i}
+$$
+
+> Where:
+>
+> $Y..$ is the sum of the row sums.
+>
+> $\sum r_i$ is the number of replicates. (there ar 17 in this case)
+
+I first defined my parameters $\sum r_i$, and computed $Y..$ , the sum of the row sums, as follows:
+
+```{r}
+#define parameters
+ri.sum <- 17
+
+#compute the sum
+Ydot2 <- 10 + 5.1 + 12 + 8.4
+
+#View Result
+cat('Y.. = ', Ydot2)
+```
+
+I then computed the formula
+
+```{r}
+#Formula
+CF <- ((Ydot2)^2/(ri.sum))
+
+#View
+CF
+```
+
+The **Correction Factor** is $74.13$
+
+### Step 3: Total SS
+
+Total SS is computed as per the formula:
+
+$$
+TotalSS = \sum Y^2_{ij} - CF
+$$
+
+To compute $\sum Y^2_{ij}$, I computed the individual squares of each element and summed them up.
+
+```{r}
+Y2.sum <- sum(2.0^2, 2.2^2, 1.8^2, 2.3^2, 1.7^2, 1.7^2, 1.9^2, 1.5^2, 2.0^2, 2.4^2, 2.7^2, 2.5^2, 2.4^2, 2.1^2, 2.2^2, 2.2^2, 1.9^2)
+```
+
+I then computed the formula as follows:
+
+```{r}
+#compute formula
+TotalSS <- Y2.sum - CF
+
+#View result
+TotalSS
+```
+
+The **Total Sum of Squares** is $1.638$
+
+### Step 4: Treatment SS
+
+The Treatment SS (TRT SS) is computed as per the formula:
+
+$$
+TRTSS = \sum \frac{Y^2_i}{r_i} - CF
+$$
+
+First, I defined my parameters, then computed the formula as follows:
+
+```{r}
+#define parameters
+ri <- c(5, 3, 5, 4)
+Y_i <- c(10, 5.1, 12, 8.4)
+
+#compute the formula
+TRTSS <- sum(((Y_i)^2)/ri) - CF
+
+#View result
+TRTSS
+```
+
+The **Treatment Sum of Squares** is $0.98$.
+
+### Step 5: Error SS
+
+The Error SS is computed as per the formula:
+
+$$
+ErrorSS = TotalSS - TRTSS
+$$
+
+I computed this as follows:
+
+```{r}
+#compute the formula
+ErrorSS <- TotalSS - TRTSS
+
+#view
+ErrorSS
+```
+
+The **Error Sum of Squares** is $0.66$.
+
+## 3. Generate the ANOVA table
+
+The Anova table requires **Degrees of Freedom, the Sum of Squares(Total, Treatment, Error), the Mean Squares** and the **F-Statistic.**
+
+First I computed the degrees of freedom, as per the formulas:
+
+$$
+DF_{trt} = t - 1\\
+DF_{err} = \sum r_i - t\\
+DF_{total} = \sum r_i - 1 
+$$
+
+> Where:
+>
+> $DF_{trt}$ is the Treatment Degrees of Freedom
+>
+> $DF_{err}$ is the Error Degrees of Freedom
+>
+> $DF_{total}$ is the Total Degrees of Freedom.
+
+```{r}
+#define parameters
+t <- 4
+ri <- 17
+
+# Compute degrees of freedom
+Df_trt <- t - 1
+Df_err <- ri - t
+Df_tot <- ri - 1
+
+#View results
+cat('\n Treatment Df: ', Df_trt, '\n Error Df: ', Df_err, '\n Total Df: ', Df_tot)
+```
+
+I then computed the **Mean Squares (MS)**, as per the formulas:
+
+$$
+MS_{trt} = \frac{SS_{trt}}{DF_{trt}}\\
+MS_{err} = \frac{SS_{err}}{DF_{err}}
+$$
+
+> Where:
+>
+> $MS_{trt}$ is the Treatment Mean Squares.
+>
+> $MS_{err}$ is the Error Mean Squares.
+
+This is computed as follows:
+
+```{r}
+# Compute Mean Square (MS)
+MS_trt <- TRTSS / Df_trt
+MS_err <- ErrorSS / Df_err
+
+#View results
+cat('\n Treatment MS: ', MS_trt, '\n Error MS: ', MS_err)
+```
+
+I then computed the F-statistic as per the formula:
+
+$$
+F_{value} = \frac{MS_{trt}}{MS_{err}}
+$$
+
+This is computed as follows:
+
+```{r}
+# Compute F-value for Treatment
+F_value <- MS_trt / MS_err
+
+#View results
+cat('F value: ', F_value)
+```
+
+I then input this into a dataframe to create the anova table as follows:
+
+```{r}
+# Create ANOVA table
+anova_table2 <- data.frame(
+  Sources_of_Variation = c("Treatment", "Error", "Total"),
+  Df = c(Df_trt, Df_err, Df_tot),
+  SS = c(TRTSS, ErrorSS, TotalSS),
+  MS = c(MS_trt, MS_err, NA),  # MS for Total is not applicable
+  F = c(F_value, NA, NA)  # F for Error and Total is not applicable
+ 
+)
+
+# Print ANOVA table
+print(anova_table2, row.names = FALSE)
+
+```
+
+## 4. At 5% and 10% levels of significance, test the hypothesis and make conclusions
+
+First I defined my degrees of freedom.
+
+```{r}
+# Degrees of freedom for critical F-value
+Df1 <- Df_trt
+Df2 <- Df_err
+```
+
+### Step 1: At 5% Significance Level
+
+I used the `qf()` function to obtain the Critical F value at a 5% level of significance. I then compared the obtained F-statistic to the F_value, to make conclusions on the null hypothesis.
+
+```{r}
+# Critical F-value at 5% significance level
+critical_F_5 <- qf(0.95, Df1, Df2)
+
+# Test hypothesis at 5% significance level
+if (F_value > critical_F_5) {
+  cat("\n F_value: ", F_value, "\n Critical Value: ", critical_F_5, "\n ", "\n Null hupothesis rejected")
+} else {
+  cat("\n F_value: ", F_value, "\n Critical Value: ", critical_F_5, "\n ", "\n Fail to reject null hypothesis")
+}
+```
+
+The F_value (6.41) is **greater than** the Critical value (3.41), thus at a 90% confidence level **we reject the null hypothesis** stated as $H_0: \mu_1 = \mu_2 = \mu_3$. Thus, there is at least one statistically significant difference among the means.
+
+### Step 2: At 10% Significance Level
+
+I repeated the procedure at 10% significance level.
+
+```{r}
+# Critical F-value at 10% significance level
+critical_F_10 <- qf(0.90, Df1, Df2)
+
+# Test hypothesis at 10% significance level
+if (F_value > critical_F_10) {
+  cat("\n F_value: ", F_value, "\n Critical Value: ", critical_F_10, "\n ", "\n Null hupothesis rejected")
+} else {
+  cat("\n F_value: ", F_value, "\n Critical Value: ", critical_F_5, "\n ", "\n Fail to reject null hypothesis")
+}
+```
+
+The F_value (6.42) is **greater than** the Critical value (2.56), thus at a 90% confidence level **we reject the null hypothesis** stated as $H_0: \mu_1 = \mu_2 = \mu_3$. Thus, there is at least one statistically significant difference among the means.

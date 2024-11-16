@@ -1,0 +1,247 @@
+---
+title: "STA4020A-Assignment 3"
+author: "Chesia Anyika"
+date: "2024-06-14"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#libraries
+library(nlme)
+library(tidyverse)
+```
+
+# Task: Optimizing Corn Yield with Simulated RCBD Data
+
+The Agricultural Research Institute (ARI) is planning an experiment to investigate the impact of corn variety selection on yield, considering the influence of soil fertility. They need your help to simulate data and analyze it beforehand. The experiment involves three promising corn varieties (V1, V2, V3) planted within six distinct blocks representing different soil fertility levels. Each block will contain a randomized plot for each variety.
+
+**Questions**
+
+a)  Simulate the yield data with some random variation between varieties and blocks.
+
+b)  State the null and alternative hypotheses for the effect of variety (or blocking) on yield.
+
+c)  Perform an ANOVA to assess the effect of variety on yield while accounting for the block effect as a random factor.
+
+d)  Based on the p-value, can you conclude a significant difference in yield between the varieties at a 5% significance level? Explain your reasoning.
+
+e)  Create boxplots to visually compare the distribution of yield across the different corn varieties.
+
+f)  Based on your analysis of the simulated data, summarize your key findings regarding the effect of corn variety on yield.
+
+g)  How can the results from the actual experiment, if they confirm the simulated findings, be used to inform future corn breeding programs and selection strategies for maximizing yield?
+
+## 1. Simulation of Yield Data
+
+First I defined the Corn Varieties and Blocks.
+
+```{r}
+# Define the varieties and blocks
+varieties <- c('V1', 'V2', 'V3')
+blocks <- c('B1', 'B2', 'B3', 'B4', 'B5', 'B6')
+```
+
+I then set baseline yields and variations as follows:
+
+-   Assigned a baseline yield to each variety.
+
+-   Assigned a baseline yield adjustment for each soil fertility block.
+
+-   Introduced random variation to simulate real-world data.
+
+```{r}
+# Define the baseline yields for varieties (mean yield)
+variety_effects <- c(V1 = 100, V2 = 110, V3 = 105)
+
+# Define the baseline adjustments for blocks (mean adjustment)
+block_effects <- c(B1 = -5, B2 = 0, B3 = 5, B4 = -10, B5 = 10, B6 = 0)
+
+# Standard deviation of random noise
+std_dev <- 5
+```
+
+I then simulated the data such that For each combination of variety and block, the yield is computed as:
+
+$$
+\text{Yield} = \text{Variety Effect} + \text{Block Effect} + \text{Random Noise}
+$$
+
+Where the random noise is normally distributed with $\mu = 0$ and $\sigma = 5$
+
+```{r}
+# Set seed for reproducibility
+set.seed(42)
+
+# Generate the data
+data <- expand.grid(Block = blocks, Variety = varieties)
+data$Yield <- mapply(function(variety, block) {
+  base_yield <- variety_effects[variety]
+  block_adjustment <- block_effects[block]
+  random_noise <- rnorm(1, mean = 0, sd = std_dev)
+  yield_value <- base_yield + block_adjustment + random_noise
+  return(yield_value)
+}, data$Variety, data$Block)
+
+# Display the data
+print(data)
+```
+
+## 2. Null and Alternative Hypotheses
+
+### 2.1 Effect of Variety on Yield
+
+**Null Hypothesis (H0):** There is no significant effect of corn variety on yield. This means that the mean yields of all corn varieties are equal
+
+$$
+H_{0}: \mu_{V1} = \mu_{V2} = \mu_{V3}
+$$
+
+**Alternative Hypothesis (H1):** There is a significant effect of corn variety on yield. This means that at least one corn variety has a mean yield different from the others.
+
+$$
+H_1: \text{At least one } \mu_i\ (\text{where }i \in [V1, V2, V3])\ \text{is different}
+$$
+
+### 2.2 Effect of Blocking on Yield
+
+**Null Hypothesis (H0):** There is no significant effect of soil fertility blocks on yield. This means that the mean yields of all blocks are equal.
+
+$$H_{0}: \mu_{B1} = \mu_{B2} = \mu_{B3} = \mu_{B4} = \mu_{B5} = \mu_{B6}
+ $$ **Alternative Hypothesis (H1):** There is a significant effect of soil fertility blocks on yield. This means that at least one block has a mean yield different from the others.
+
+$$
+H_{1}: \text{At least one } \mu_{i}\ (\text{where }i \in [B1, B2, B3, B4, B5, B6])\ \text{is different}
+$$
+
+## 3. ANOVA Test
+
+To perform an ANOVA to assess the effect of variety on yield while accounting for the block effect as a random factor, we can use a mixed-effects model. In R, this can be done using the `nlme` package, which allows us to specify fixed and random effects in our model.
+
+### 3.1 Mixed-Effects Model
+
+First I ran the mixed effects model:
+
+```{r}
+# Convert Block and Variety to factors
+data$Block <- as.factor(data$Block)
+data$Variety <- as.factor(data$Variety)
+
+# Fit the mixed-effects model using nlme
+model <- lme(Yield ~ Variety, random = ~1 | Block, data = data)
+
+# Display the summary of the model
+summary(model)
+
+
+```
+
+**Intepretation**
+
+This gives us three outputs:
+
+-   **Output 1**
+
+    Summarizes a linear mixed-effects model fit to the data, including random effects for blocks (capturing variability between blocks) and fixed effects for varieties (assessing the impact on yield), along with correlations between fixed effects and standardized residuals within each block.
+
+-   **Output 2**
+
+    This output summarizes the model fit using information criteria and likelihood values:
+
+    The **AIC (Akaike Information Criterion)** is `117.3975`, the **BIC (Bayesian Information Criterion)** is `120.9377`. Lower AIC and BIC values indicate a better fit. relative to other models considered. As there are no other models considered in this case, these metrics are not useful.
+
+    The **log-likelihood** is `-53.69874`. This reflects the maximized value of the likelihood function for the model, ranging from $-\infty \ \text{to } 0$ , with $0$ representing a perfect fit. The value of `-53.69874` indicates a moderate fit of the variability within the model to the data, which is acceptable for our purposes.
+
+-   **Output 3**
+
+### 3.2 ANOVA Test
+
+I then ran an ANOVA test of the mixed-effects model as follows:
+
+```{r}
+anova(model)
+```
+
+**Interpretation**
+
+The `Variety` variable shows a statistically significant effect on yield, as the P-Value of `0.0013` is lower than the chosen significance level of 0.05. Thus, we can **reject the Null Hypothesis** that there is no significant effect of corn variety on yield.
+
+The F-value of `13.8432` indicates the strength of this effect, and the low p-value (`0.0013`) suggests that the difference in yield between at least one pair of varieties is significant.
+
+## 4. Box-Plot
+
+I then created a box-plot to visually compare the distribution of yield across the different corn varieties.
+
+```{r}
+# Create boxplot
+ggplot(data, aes(x = Variety, y = Yield, fill = Variety)) +
+  geom_boxplot(color = "black") + 
+  labs(x = "Variety of Corn", y = "Yield") +
+  scale_fill_discrete(name = "Variety") + 
+  ggtitle("Distribution of Yield by Corn Variety") +
+  theme_minimal()
+
+```
+
+**Interpretation**
+
+-   **Median - Median Line.**
+
+    **Variety 2** of corn appears to have the **highest median yield**, followed by Versions 1 and 3 which have similar median yields.
+
+-   **Interquartile Range - Length of Box**
+
+    **Variety 1** of corn has the narrowest interquartile range, indicating the **lowest** **variability in crop yields**. This is followed by Versions 2 and 3 which have similar interquartile ranges.
+
+-   **Variability and Outliers - Whiskers**
+
+    **Variety 2** has the longest whiskers compared to Varieties 3 and 1, indicating high variability in yield compared to the two other varieties. Furthermore, there appear to be no outliers for any of the varieties, as there are no points beyond the whiskers of the respective boxes.
+
+**Summary**
+
+-   **Variety 1** has the lowest variability in crop yields, and lower median yield than Variety 2.
+
+-   **Variety 2** has the highest median yield, as well as highest variability in crop yields.
+
+-   **Variety 3** has high variability in crop yields, but lower median crop yields than variety 2.
+
+## 5. Summary of Analysis
+
+-   **Statistical Significance**:
+
+    -   The statistical model indicates that the corn variety has a significant effect on yield, suggesting a statistically significant difference in mean yield across at least one of the Variety pairs.
+
+-   **Effect Sizes**:
+
+    -   Variety 2 shows the highest estimated mean yield, approximately 1`4.05` units higher than Variety V1.
+
+    -   Variety V3, on the other hand, has a slightly lower estimated mean yield compared to Variety V1, though the difference (-0.17177 units) is minimal.
+
+-   **Conclusion**:
+
+    -   Variety V2 appears to be the most promising in terms of yield, with the highest median and potentially higher average yield compared to V1 and V3.
+
+    -   Variety V1 shows the least variability in yield but has a lower median yield compared to V2.
+
+    -   Variety V3 exhibits variability similar to V2 but with a lower median yield.
+
+## 6. Application of Findings
+
+> **How can the results from the actual experiment, if they confirm the simulated findings, be used to inform future corn breeding programs and selection strategies for maximizing yield?**
+
+If the results from the actual experiment confirm the simulated findings regarding the impact of corn variety on yield, they can provide valuable insights for informing future corn breeding programs and selection strategies aimed at maximizing yield. Here's how these findings can be effectively utilized:
+
+1\. **Identifying High-Yielding Varieties**: The experiment can confirm which specific corn varieties (e.g., V2) consistently produce higher yields compared to others (e.g., V1 and V3). This information is crucial for breeders to prioritize and further develop high-performing varieties.
+
+2\. **Understanding Yield Variability**: The experiment can quantify and validate the variability in yield across different varieties (e.g., narrow vs. wide interquartile ranges). This knowledge helps breeders understand the stability of yield performance under varying environmental conditions.
+
+3\. **Optimizing Variety Selection**: Based on confirmed yield data, breeders can strategically select parent lines for future breeding cycles. Varieties with proven high yields and favorable agronomic traits can serve as excellent candidates for hybridization and genetic improvement.
+
+4\. **Adaptive Breeding Strategies**: The confirmed findings allow breeders to adopt adaptive breeding strategies. For example, focusing on regions or environments where high-yielding varieties (e.g., V2) perform exceptionally well can optimize crop performance and farmer profitability in those specific areas.
+
+5\. **Long-term Genetic Gain**: Continuous evaluation and integration of confirmed high-yielding varieties into breeding programs contribute to long-term genetic gain. This iterative process ensures that future corn varieties are progressively improved in yield potential.
+
+Overall, leveraging the confirmed experiment results enhances the precision and effectiveness of corn breeding programs, ensuring that new varieties meet the evolving demands of productivity in agriculture.

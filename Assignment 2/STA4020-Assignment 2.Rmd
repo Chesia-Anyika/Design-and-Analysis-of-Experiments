@@ -1,0 +1,1455 @@
+---
+title: "STA4020A - Assignment 2"
+author: "Chesia Anyika"
+date: "2024-06-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Question 1
+
+A researcher is conducting an experiment to test the effectiveness of four different fertilizers (A, B, C, D) on the yield of a specific crop. The experiment is conducted in four different fields (blocks) to account for variability in soil quality and other environmental factors. Each field is divided into four plots, and each fertilizer is randomly assigned to one plot within each field.
+
+The yield data (in kilograms) from the experiment are as follows:
+
+| Field | Fertilizer A | Fertilizer B | Fertilizer C | Fertilizer D |
+|-------|--------------|--------------|--------------|--------------|
+| 1     | 20           | 18           | 15           | 22           |
+| 2     | 25           | 24           | 20           | 23           |
+| 3     | 18           | 17           | 14           | 20           |
+| 4     | 22           | 21           | 19           | 24           |
+
+## Libraries
+
+```{r}
+library(reshape2)
+library(car)
+```
+
+## **a) State the null and alternative hypotheses for this experiment.**
+
+The **Null Hypothesis** is that there is **no significant difference in the mean yield of the crop across fertilizers**. This is expressed mathematically as:
+
+$$
+H_0:\mu_1 = \mu_2 = \mu_3 = \mu_4
+$$
+
+The **Alternative Hypothesis** is that **at least one of the fertilizers leads to a significantly different mean yield of crops** compared to others. This can be expressed mathematically as either of the following:
+
+$$
+H_A : \mu_1 = \mu_2 = \mu_3 \neq \mu_4\\
+H_A : \mu_1 = \mu_2 \neq \mu_3 = \mu_4\\
+H_A : \mu_1 \neq \mu_2 = \mu_3 = \mu_4\\
+H_A : \mu_1 \neq \mu_2 \neq \mu_3 \neq \mu_4
+$$
+
+As this experiment involves two sources of variation -- variation due to different fertilizers (treatments) and variation due to different fields (replicates) -- for the purpose of hypothesis testing, we can formulate separate **Null hypotheses for each source of variation** as follows:
+
+1.  **Null Hypothesis for Treatments (Fertilizers)**
+
+    There is no significant difference in the mean yield of crop among the different fertilizers.
+
+2.  **Null Hypothesis for Replicates (Fields)**
+
+    There is no significant difference in the mean yield of crop among the different fields.
+
+Their respective **Alternative Hypotheses** are:
+
+1.  **Alternative Hypothesis for Treatments (Fertilizer)**
+
+    There are significant differences in the mean yield of crop among the different fertilizers.
+
+2.  **Alternative Hypothesis for Replicates (Field)**
+
+    There are significant differences in the mean yield of crop among the different fields.
+
+## **b) Construct an ANOVA table.**
+
+**Construct an ANOVA table for the RCBD analysis and determine whether there is a significant difference among the fertilizers and (or) replicates at the 0.05 significance level.**
+
+First I created the table above in r, as follows:
+
+```{r}
+#create vectors
+Field <- seq(1,4)
+FertilizerA <- c(20, 25, 18, 22)
+FertilizerB <- c(18, 24, 17, 21)
+FertilizerC <- c(15, 20, 14, 19)
+FertilizerD <- c(22, 23, 20, 24)
+
+# create table
+F.data <- data.frame(Field, FertilizerA, FertilizerB, FertilizerC, FertilizerD)
+
+#set Field as index and remove column
+rownames(F.data) <- F.data$Field
+F.data <- F.data[, -which(names(F.data) == "Field")]
+
+# view the table
+F.data
+```
+
+To construct the ANOVA table, I need the **Replicate, Treatment, Error and Total Sum of Squares**, their respective **Degrees of Freedom**, **Mean Squares** and **F-Statistic Values**
+
+To compute these, we need the **Treatment Totals (** $Y_{i.}$ **), Replicate Totals (** $Y_{.j}$ **)**, **Experimental Totals (** $Y..$ **)** and the **Sum of Squares of Individual Observations (** $\sum Y_{ij}^2$ **)**.
+
+I computed the **Replicate totals** by getting the sum of the observations row-wise, and created a new column in the table as follows:
+
+```{r}
+#compute the rowsums
+F.data$Yj <- c(rowSums(F.data))
+
+#view the table
+F.data
+```
+
+To compute the **Treatment Totals**, I computed the sums of the observations column-wise. I then created a new row of Treatment Totals as follows:
+
+```{r}
+#compute columnsums
+Yi <- c(colSums(F.data))
+
+#rowbind the results
+F.data <- rbind(F.data, Yi)
+
+#add row index
+rownames(F.data)[nrow(F.data)] <- "Yi"
+
+F.data
+```
+
+The value at the intersection of $Y_{i.}$ and $Y_{.j}$ is the **Experiment Total (** $Y..$ **)**, and it is $322$.
+
+For the **Sum of Squares of Individual Observations (** $\sum Y^2_{ij}$ **)**, I computed this for each column and added a row of the results to the table as follows:
+
+```{r}
+#subset the relevant rows
+subset_df <- F.data[1:4, 1:4]
+
+#compute the sums
+Yij.sq.sum <- c(colSums(subset_df^2))
+
+#view results
+Yij.sq.sum
+```
+
+```{r}
+#transfer results to named vector
+Yij.sq.sum <-c(1833, 1630, 1182, 1989)
+
+#get sum
+Yij.sq.sum <- c(Yij.sq.sum, sum(Yij.sq.sum))
+
+#view results
+Yij.sq.sum
+```
+
+```{r}
+#add resulting vector to dataframe
+F.data <- rbind(F.data, Yij.sq.sum)
+
+#add row index
+rownames(F.data)[nrow(F.data)] <- "SS"
+
+#view results
+F.data
+```
+
+With these computed parameters, we can now compute the **Correction Factor**, as well as the required Sums of Squares and Mean Squares for the ANOVA table.
+
+### 1. Correction Factor
+
+The Correction Factor is computed as per the following formula:
+
+$$
+CF = \frac{(Y..)^2}{tr}
+$$
+
+> Where:
+>
+> $Y..$ is the square of the Experiment Totals.
+>
+> $t$ is the number of treatments
+>
+> $r$ is the number of replicates
+
+I computed this as follows:
+
+```{r}
+#define number of treatments and replicates
+t <- 4
+r <- 4
+
+#compute Correction Factor
+CF <- ((F.data[5,5])^2)/(t*r)
+
+#View results
+CF
+```
+
+The **Correction Factor** is $6480.25$.
+
+### 2. Sum of Squares (SS)
+
+#### A. Total Sum of Squares (TSS)
+
+The Total SS is computed as per the formula:
+
+$$
+TSS = \sum Y^2_{ij} - CF
+$$
+
+> Where:
+>
+> $Y^2_{ij}$ is the Sum of Squares of all observations.
+>
+> $CF$ is the Correction Factor
+
+I computed this as follows:
+
+```{r}
+#compute the Total SS
+TSS <- (sum(F.data[6,5]))- CF
+
+#View the results
+TSS
+```
+
+The **Total SS** is $153.75$
+
+#### B. Replicate Sum of Squares (Rep SS)
+
+The Replicate SS is computed as per the following formula:
+
+$$
+Rep\ SS = \frac{\sum Y_{.j}^2}{t} - CF
+$$
+
+> Where:
+>
+> $Y_{.j}^2$ is the Sum of Squares of Replicate Totals
+>
+> $t$ is the number of treatments
+>
+> $CF$ is the Correction Factor
+
+I computed this as follows:
+
+```{r}
+#Compute the Replicate SS
+Rep.SS <- ((sum(F.data[1:4,5]^2))/t) - CF
+
+#View the results
+Rep.SS
+```
+
+The **Replicate SS** is $81.25$
+
+#### C. Treatment Sum of Squares (Trt SS)
+
+The Treatment SS is computed as per the formula:
+
+$$
+Trt\ SS = \sum \frac{Y_{i.}^2}{r} - CF 
+$$
+
+> Where:
+>
+> $Y_{i.}^2$ is the Sum of Squares of the Treatment Totals.
+>
+> $r$ is the number of replicates.
+>
+> $CF$ is the Correction Factor
+
+I computed this as follows:
+
+```{r}
+#Compute the Treatment SS
+Trt.SS <- ((sum(F.data[5, 1:4]^2))/r) - CF
+
+#View the results
+Trt.SS
+```
+
+The **Treatment SS** is $62.25$
+
+#### D. Error Sum of Squares (Err SS)
+
+The Error SS is computed as per the following formula:
+
+$$
+Err\ SS = TSS - Rep\ SS - Trt\ SS
+$$
+
+> Where:
+>
+> $TSS$ is the Treatment Sum of Squares.
+>
+> $Rep\ SS$ is the Replicate Sum of Squares.
+>
+> $Trt\ SS$ is the Treatment Sum of Squares.
+
+I computed this as follows:
+
+```{r}
+#Compute the Error SS
+Err.SS <- TSS - Rep.SS - Trt.SS
+
+#View the results
+Err.SS
+```
+
+The **Error SS** is $10.25$
+
+### 3. Mean Squares (MS)
+
+#### A. Replicate Mean Squares (Rep MS)
+
+The Replicate MS is computes as follows:
+
+$$
+Rep\ MS = \frac{Rep\ SS}{r-1} 
+$$
+
+> Where:
+>
+> $Rep SS$ is the Replicate Sum of Squares
+>
+> $r$ is the number of replicates
+>
+> $r-1$ represents the **Replicates** **Degrees of Freedom.**
+
+I computed this as follows:
+
+```{r}
+#define Replicate DF
+df.rep <- r-1
+
+#compute the Replicate MS
+Rep.MS <- Rep.SS/(df.rep)
+
+#View results
+Rep.MS
+```
+
+The **Replicate MS** is $27.0833$
+
+#### B. Treatment Mean Squares (Trt MS)
+
+The Treatment MS is computed as per the formula:
+
+$$
+Trt\ MS = \frac{Trt\ SS}{t-1}
+$$
+
+> Where:
+>
+> $Trt\ SS$ is the Treatment Sum of Squares.
+>
+> $t$ is the number of treatments
+>
+> $t-1$ represents the **Treatment Degrees of Freedom**
+
+I computed this as follows:
+
+```{r}
+#define the Treatment Df
+df.trt <- t-1
+
+#compute the Treatment MS
+Trt.MS <- Trt.SS/df.trt
+
+#view the results
+Trt.MS
+```
+
+The **Treatment MS** is $20.75$.
+
+#### C. Error Mean Squares (Err MS)
+
+The Error MS is computed as per the following formula:
+
+$$
+Error\ MS = \frac{Err\ SS}{(r-1)(t-1)} 
+$$
+
+> Where
+>
+> $Err\ SS$ is the Error Sum of Squares
+>
+> $r$ is the number of replicates
+>
+> $t$ is the number of treatments
+>
+> $(r-1)(t-1)$ represents the **Error Degrees of Freedom**
+
+I computed this as follows:
+
+```{r}
+#define the Error Df
+df.err <- (r-1)*(t-1)
+
+#compute the Error mean squares
+Err.MS <- Err.SS/df.err
+
+#View results
+Err.MS
+```
+
+The **Error MS** is $1.1389.$
+
+### 4. Degrees of Freedom (DF)
+
+The **Replicate, Treatment and Error Degrees of Freedom** have been calculated with the Mean Squares. They are as follows:
+
+```{r}
+#View the Degrees of Freedom
+cat('\n Replicate DF: ', df.rep,
+    '\n Treatment DF: ', df.trt,
+    '\n Error DF: ', df.err)
+```
+
+The **Total Degrees of Freedom** are computed as per the formula:
+
+$$
+TDF= tr-1
+$$
+
+I computed this as follows:
+
+```{r}
+#compute the Total DF
+df.t <- (t*r)-1
+
+#view the results
+df.t
+```
+
+The **Total Degrees of Freedom** are $15$.
+
+### 5. F-Statistics
+
+#### A. Replicate F-Statistic
+
+The Replicate F-Statistic is computed as per the formula:
+
+$$
+F_{rep} = \frac{Rep\ MS}{Err\ MS}
+$$
+
+> Where:
+>
+> $Rep\ MS$ is the Replicate Mean Squares.
+>
+> $Err MS$ is the Error Mean Squares.
+
+I computed this as follows:
+
+```{r}
+#compute the replicate Fstat
+F.rep <- Rep.MS/Err.MS
+
+#Voew the result
+F.rep
+```
+
+The **Replicate F-Statistic** is $23.78049$.
+
+#### B. Treatment F-Statistic
+
+The Treatment F-Statistic is computed as per the formula:
+
+$$
+F_{trt} = \frac{Trt\ MS}{Err\ MS} 
+$$
+
+I computed this as follows:
+
+```{r}
+#compute the Treatment Fstat
+F.trt <- Trt.MS/Err.MS
+
+#View the result
+F.trt
+```
+
+The **Treatment F-Statistic** is $18.220$.
+
+With these computed parameters we can now construct the **ANOVA Table**.
+
+### ANOVA Table
+
+I constructed the ANOVA Table as follows:
+
+```{r}
+#construct the anova table
+anova_table <- data.frame(
+  SOV = c("Replicate","Treatment", "Error", "Total"), #SOV stands fo Sources of Variation
+  Df = c(df.rep, df.trt, df.err, df.t),
+  SS = c(Rep.SS,Trt.SS, Err.SS, TSS),
+  MS = c(Rep.MS, Trt.MS, Err.MS, NA),  # MS for Total is not applicable
+  F = c(F.rep, F.trt, NA, NA)  # F for Error and Total is not applicable
+)
+
+#View the result
+anova_table
+```
+
+## **c) Interpret the results of the ANOVA table.**
+
+To interpret the results of the ANOVA table, I compared the computed F-statistic values for the Treatments and the Replicates to the F-Statistics from the **F-distribution table**. This will determine whether we can **reject or fail to reject the previously defined Null hypotheses for the Treatments and Replicates.**
+
+I used the `qf()` function to compute the F-distribution values, at both $95\%$ confidence levels, as follows:
+
+```{r}
+#define the alpha levels
+alpha05 <- 0.05
+
+#compute F-values
+##95% significance
+F.Rep05 <- qf(1-alpha05, df.rep, df.err)
+F.Trt05 <- qf(1-alpha05, df.trt, df.err)
+
+
+#View results
+cat('\n F.Rep05: ', F.Rep05,
+    '\n F.Trt05: ', F.Trt05)
+```
+
+The computed F-values are as follows:
+
+$$
+\textbf{Replicate F-values}\\
+F_{0.5;3;9} = 3.8625 \\
+F_{0.1;3;9} = 6.9919 \\
+\textbf{Treatment F-values}\\
+F_{0.5;3;9} = 3.8625 \\
+F_{0.1;3;9} = 6.9919
+$$
+
+I compared these values to the ANOVA Table, such that is the **ANOVA F-values are greater than the F-distribution table values**, we will **reject the Null Hypothesis** that there is no significant difference in the mean crop yields.
+
+I used an **if statement** to compare the Replicate F-values as follows:
+
+```{r}
+# Test hypothesis for Replicate F-value - 95% sig 
+if (F.rep > F.Rep05) {
+  cat("\n F_value: ", F.rep, "\n Critical Value: ", F.Rep05, "\n ", "\n Null hypothesis rejected")
+} else {
+  cat("\n F_value: ", F.rep, "\n Critical Value: ", F.Rep05, "\n ", "\n Fail to reject null hypothesis")
+}
+```
+
+The **Null Hypothesis is Rejected** at a $95\%$ confidence level. Thus, there are significant differences in the mean yield of crop among the different fields.
+
+I similarly compared the Treatment F-values as follows:
+
+```{r}
+# Test hypothesis for Treatment F-value - 95% sig 
+if (F.trt > F.Trt05) {
+  cat("\n F_value: ", F.trt, "\n Critical Value: ", F.Trt05, "\n ", "\n Null hypothesis rejected")
+} else {
+  cat("\n F_value: ", F.trt, "\n Critical Value: ", F.Trt05, "\n ", "\n Fail to reject null hypothesis")
+}
+```
+
+The **Null Hypothesis is Rejected** at a $95\%$ confidence level. Thus, there are significant differences in the mean yield of crop among fertilizers.
+
+## **d) Conduct a post-hoc analysis if necessary.**
+
+A **post-hoc** test to the ANOVA is a statistical procedure performed after an ANOVA to determine which specific group differences are significant when the overall test indicates significant differences among the groups.
+
+I chose the **Tukey's HSD (Honestly Significant Difference) Test**, which is a post-hoc analysis which controls for type I error (false positives, when a statistical test incorrectly rejects an true Null Hypothesis).The test measures the least amount that means must vary to be truly different.
+
+### 1. Test of Assumptions
+
+The Tukey's HSD test makes three assumptions about the data tested, which are:
+
+-   **Normality** - The test assumes the population from which samples are drawn is normally distributed.
+
+-   **Homoscedasticity** - The test assumes the variances within each group should be approximately equal.
+
+-   **Independence** - The test assumes observations are independent of each other.
+
+I tested my data for these three assumptions before applying the test.
+
+#### A. Normality
+
+To test for **Normality**, I used a **Shapiro WIlks Test**. I set my confidence level at $95\%$, such that if the $p.value > 0.05$, we can assume normality. I conducted this test as follows:
+
+```{r}
+#create dataframe and ensure values are numeric
+F.data2 <- data.frame(FertilizerA, FertilizerB, FertilizerC, FertilizerD)
+F.data2 <- sapply(F.data2, as.numeric)
+
+#view the result
+F.data2
+```
+
+```{r}
+#conduct shapiro test
+shapiro.test(F.data2)
+```
+
+The p-value of $0.7978$ is **greater than** the significance level of $0.05$. Thus, we can assume normality of the data.
+
+#### B. Homoscedasticity
+
+To test for **Homoscedasticity** using a **Levene Test** at a $95\%$ confidence level, such that if the $p.value > 0.05$ we can assume homogeneity of variances in the data. I conducted this test as follows:
+
+```{r}
+#library(reshape2)
+#reshape the data into long format
+long_df <- melt(F.data2)
+
+# Rename columns to appropriate names
+colnames(long_df) <- c("field", "treatment", "yield")
+
+long_df$field <- as.factor(long_df$field)
+#view dataframe
+long_df
+```
+
+```{r}
+#library(car)
+#conduct Levene test
+leveneTest(yield~treatment, data = long_df)
+leveneTest(yield~field, data = long_df)
+```
+
+In the case of Treatments, The p-value of $0.4139$ is **greater than** the significance level of $0.05$. Thus, we can assume homoscedasticity of the data.
+
+In the case of Replicates, The p-value of $0.8561$ is **greater than** the significance level of $0.05$. Thus, we can assume homoscedasticity of the data.
+
+#### C. Independence
+
+In our Randomized Complete Block Design (RCBD), treatments were randomly assigned to four different fields, ensuring that any differences or variations between the fields are not systematically related to the treatment assignments. This randomization procedure guarantees that the treatments applied to each field are independent of each other, satisfying the assumption of independence in our data analysis.
+
+**All the assumptions are met**, Thus we can proceed with the Tukey's HSD test.
+
+### 2. Conduct Tukey's HSD Test
+
+#### Comparing Treatment Groups (Fertilizers)
+
+I first conducted a Tukey's test to compare differences between treatment groups, as follows:
+
+```{r}
+# Fit ANOVA model
+model1 <- aov(yield ~ treatment, data = long_df)
+
+# Perform Tukey's HSD test
+tukey_result1 <- TukeyHSD(model1)
+
+# View the results
+tukey_result1
+
+```
+
+**Interpretation**
+
+The columns of the Tukey's HSD test represent the following:
+
+-   **diff** - The difference in means between the two compared groups.
+
+-   **lwr** - The lower bound of the 95% confidence interval for the difference.
+
+-   **upr** - The upper bound of the 95% confidence interval for the difference.
+
+-   **p adj** - The adjusted p-value for the pairwise comparison, adjusted for multiple comparisons using Tukey's method.
+
+**1. Fertilizer B vs. Fertilizer A**
+
+The difference in means between Fertilizer B and Fertilizer A is -1.25. The confidence interval includes 0, and the adjusted p-value is very high (0.9169), indicating **no significant difference between Fertilizer B and Fertilizer A.**
+
+**2. Fertilizer C vs. Fertilizer A**
+
+The difference in means between Fertilizer C and Fertilizer A is -4.25. The confidence interval includes 0, and the adjusted p-value is 0.1850, indicating **no significant difference between Fertilizer C and Fertilizer A.**
+
+**3. Fertilizer D vs. Fertilizer A**
+
+The difference in means between Fertilizer D and Fertilizer A is 1.00. The confidence interval includes 0, and the adjusted p-value is very high (0.9546), indicating **no significant difference between Fertilizer D and Fertilizer A.**
+
+**4. Fertilizer C vs. Fertilizer B**
+
+The difference in means between Fertilizer C and Fertilizer B is -3.00. The confidence interval includes 0, and the adjusted p-value is 0.4476, indicating **no significant difference between Fertilizer C and Fertilizer B.**
+
+**5. Fertilizer D vs. Fertilizer B**
+
+The difference in means between Fertilizer D and Fertilizer B is 2.25. The confidence interval includes 0, and the adjusted p-value is 0.6661, indicating **no significant difference between Fertilizer D and Fertilizer B.**
+
+**6. Fertilizer D vs Fertilizer C**
+
+The difference in means between Fertilizer D and Fertilizer C is 5.25. The confidence interval slightly includes 0, and the adjusted p-value is 0.0807, which is close to the typical significance threshold of 0.05. This indicates **a marginally non-significant difference between Fertilizer D and Fertilizer C.**
+
+**Summary**
+
+-   **None of the pairwise comparisons show significant differences at the 0.05 level**, which means that although ANOVA indicated significant differences among groups, the specific pairwise differences are not large enough to be detected after adjusting for multiple comparisons using Tukey's HSD method.
+
+-   The closest to significance is the comparison between FertilizerD and FertilizerC, but it still does not meet the 0.05 threshold.
+
+This discrepancy can occur because ANOVA tests for overall differences, while Tukey's HSD test looks for specific pairwise differences and adjusts for multiple testing, making it more stringent.
+
+#### Comparing Replicate Groups (Fields)
+
+I then conducted the Tukey's HSD test to compare differences between replicate groups, as follows:
+
+```{r}
+# Fit ANOVA model
+model2 <- aov(yield ~ field, data = long_df)
+
+# Perform Tukey's HSD test
+tukey_result2 <- TukeyHSD(model2)
+
+# View the results
+tukey_result2
+```
+
+**Interpretation**
+
+**1. Field 2 vs. Field 1**
+
+The difference in means between Field 2 and Field 1 is 4.25. The confidence interval includes 0 ([-0.9101, 9.4101]), and the adjusted p-value is 0.1208, indicating **no significant difference between Field 2 and Field 1.**
+
+**2. Field 3 vs. Field 1**
+
+The difference in means between Field 3 and Field 1 is -1.50. The confidence interval includes 0 ([-6.6601, 3.6601]), and the adjusted p-value is 0.8235, indicating **no significant difference between Field 3 and Field 1.**
+
+**3. Field 4 v. Field 1**
+
+The difference in means between Field 4 and Field 1 is 2.75. The confidence interval includes 0 ([-2.4101, 7.9101]), and the adjusted p-value is 0.4236, indicating **no significant difference between Field 4 and Field 1.**
+
+**4. Field 3 vs. Field 2**
+
+The difference in means between Field 3 and Field 2 is -5.75. The confidence interval does not include 0 ([-10.9101, -0.5899]), and the adjusted p-value is 0.0277, indicating a **significant difference between Field 3 and Field 2, with Field 3 having a lower yield than Field 2.**
+
+**5. Field 4 vs. Field 2**
+
+The difference in means between Field 4 and Field 2 is -1.50. The confidence interval includes 0 ([-6.6601, 3.6601]), and the adjusted p-value is 0.8235, indicating **no significant difference between Field 4 and Field 2.**
+
+**5. Field 4 vs. Field 3**
+
+The difference in means between Field 4 and Field 2 is -1.50. The confidence interval includes 0 ([-6.6601, 3.6601]), and the adjusted p-value is 0.8235, indicating **no significant difference between Field 4 and Field 2.**
+
+**6. Field 4 vs. Field 3**
+
+The difference in means between Field 4 and Field 3 is 4.25. The confidence interval includes 0 ([-0.9101, 9.4101]), and the adjusted p-value is 0.1208, indicating **no significant difference between Field 4 and Field 3.**
+
+**Summary**
+
+The Tukey's HSD test shows that **there is a significant difference between Field 3 and Field 2, with Field 3 having a lower yield**. However, there are **no significant differences between any other pairs of fields**. This suggests that, aside from the difference between Field 3 and Field 2, the yields across the other fields are not significantly different from each other at the 95% confidence level.
+
+# Question 2
+
+A researcher conducted an experiment to evaluate the growth performance of four different plant varieties (A, B, C, and D) in five different soil types (blocks). Each soil type represents a different field condition. The experiment was set up in a randomized complete block design, with each combination of plant variety and soil type replicated four times. However, due to unforeseen circumstances, two observations are missing from the data:
+
+| Block (Soil Type) | Variety A | Variety B | Variety C | Variety D |
+|-------------------|-----------|-----------|-----------|-----------|
+| 1                 | 15        | 17        | 20        | **?**     |
+| 2                 | **?**     | 18        | 22        | 21        |
+| 3                 | 16        | 19        | 23        | 20        |
+| 4                 | 14        | 16        | ?         | 19        |
+| 5                 | 18        | 20        | 24        | 22        |
+
+## a) Estimate the missing values in this data-set.
+
+First I created the table in r
+
+```{r}
+#create vectors
+Block <- seq(1, 5)
+VarietyA <- c(15, NA, 16, 14, 18)
+VarietyB <- c(17, 18, 19, 16, 20)
+VarietyC <- c(20, 22, 23, NA, 24)
+VarietyD <- c(NA, 21, 20, 19, 22)
+
+#create dataframe
+B.data <- data.frame(Block, VarietyA, VarietyB, VarietyC, VarietyD)
+
+#set Block as index and remove column
+rownames(B.data) <- B.data$Block
+B.data <- B.data[, -which(names(B.data) == "Block")]
+
+# view the table
+B.data
+```
+
+To estimate the missing values in the dataset, I need the **Treatment Totals (** $Y_{i.}$ **)** and **Replicate Totals (** $Y_{.j}$ **)**. I computed these by getting the column sums and row sums respectively.
+
+```{r}
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#view the table
+B.data
+```
+
+```{r}
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+B.data
+```
+
+I then estimated $Y_{1,2}$ and $Y_{3,4}$ using means, as follows:
+
+```{r}
+#Estimate Y12 and Y34
+Y12 <- (((B.data[6,1])/(nrow(B.data)-2))+((B.data[2,5])/(ncol(B.data)-2)))/2
+Y34 <- (((B.data[6,3])/(nrow(B.data)-2))+((B.data[4,5])/(ncol(B.data)-2)))/2
+
+#view results
+cat('\n Y12: ', Y12,
+    '\n Y34: ', Y34)
+```
+
+I then substituted these values into the table, and recalculating the Treatment and Replicate Totals.
+
+```{r}
+#Substitute for Y12
+B.data[2,1] <- Y12
+
+#Substitute for Y34
+B.data[4,3] <- Y34
+
+#View results
+B.data
+```
+
+```{r}
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#view the table
+B.data
+```
+
+I then estimated $Y_{4,1}$ using the formula:
+
+$$
+Y_{ij} = \frac{(r(Y_{.j}) + t(Y_{i.}) - Y..)}{(r-1)(t-1)}
+$$
+
+> Where
+>
+> $r$ is the number of replicates
+>
+> $t$ is the number of treatments
+>
+> $Y_{.j}$ is the replicate total for the row of interest.
+>
+> $Yi.$ is the treatment total for the column of interest.
+>
+> $Y…$ is the Experiment Total.
+
+I computed this as follows
+
+```{r}
+#define r and t
+r <- nrow(B.data)-1
+t <- ncol(B.data)-1
+
+#compute Y41
+Y41 <- ((r*B.data[1,5])+(t*B.data[6,4])-(B.data[6,5]))/((r-1)*(t-1))
+
+#View the result
+Y41
+```
+
+I then substituted the value back into the table.
+
+```{r}
+#Substitute for Y41
+B.data[1,4] <- Y41
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#view the table
+B.data
+```
+
+I then iteratively estimated for $Y_{12}$, $Y_{34}$ and $Y_{41}$ until the values converged and remained stable, using the formula fo $Y_{ij}$ defined above.
+
+```{r}
+#replace Y12 with NA and recalculate sums
+B.data[2,1] <- NA
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#re-estimate Y12
+Y12 <- (((r*B.data[2,5])+(t*B.data[6,1]))-(B.data[6,5]))/((r-1)*(t-1))
+
+#substitute Y12
+B.data[2,1] <- Y12
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#view the table
+B.data[2,1]
+B.data
+```
+
+```{r}
+#replace Y34 with NA and recalculate sums
+B.data[4,3] <- NA
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#re-estimate Y34
+Y34 <- (((r*B.data[4,5])+(t*B.data[6,3]))-(B.data[6,5]))/((r-1)*(t-1))
+
+#substitute Y34
+B.data[4,3] <- Y34
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#view the table
+B.data[4,3]
+B.data
+```
+
+```{r}
+#replace Y41 with NA and recalculate sums
+B.data[1,4] <- NA
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#re-estimate Y41
+Y41 <- (((r*B.data[1,5])+(t*B.data[6,4]))-(B.data[6,5]))/((r-1)*(t-1))
+
+#substitute Y41
+B.data[1,4] <- Y41
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#view the table
+B.data[1,4]
+B.data
+```
+
+```{r}
+#replace Y12 with NA and recalculate sums
+B.data[2,1] <- NA
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#re-estimate Y12
+Y12 <- (((r*B.data[2,5])+(t*B.data[6,1]))-(B.data[6,5]))/((r-1)*(t-1))
+
+#substitute Y12
+B.data[2,1] <- Y12
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#view the table
+B.data[2,1]
+B.data
+```
+
+```{r}
+#replace Y34 with NA and recalculate sums
+B.data[4,3] <- NA
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#re-estimate Y34
+Y34 <- (((r*B.data[4,5])+(t*B.data[6,3]))-(B.data[6,5]))/((r-1)*(t-1))
+
+#substitute Y34
+B.data[4,3] <- Y34
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#view the table
+B.data[4,3]
+B.data
+```
+
+```{r}
+#replace Y41 with NA and recalculate sums
+B.data[1,4] <- NA
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#re-estimate Y41
+Y41 <- (((r*B.data[1,5])+(t*B.data[6,4]))-(B.data[6,5]))/((r-1)*(t-1))
+
+#substitute Y41
+B.data[1,4] <- Y41
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#view the table
+B.data[1,4]
+B.data
+```
+
+```{r}
+#replace Y12 with NA and recalculate sums
+B.data[2,1] <- NA
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#re-estimate Y12
+Y12 <- (((r*B.data[2,5])+(t*B.data[6,1]))-(B.data[6,5]))/((r-1)*(t-1))
+
+#substitute Y12
+B.data[2,1] <- Y12
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#view the table
+B.data[2,1]
+B.data
+```
+
+```{r}
+#replace Y34 with NA and recalculate sums
+B.data[4,3] <- NA
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#re-estimate Y34
+Y34 <- (((r*B.data[4,5])+(t*B.data[6,3]))-(B.data[6,5]))/((r-1)*(t-1))
+
+#substitute Y34
+B.data[4,3] <- Y34
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#view the table
+B.data[4,3]
+B.data
+```
+
+```{r}
+#replace Y41 with NA and recalculate sums
+B.data[1,4] <- NA
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#re-estimate Y41
+Y41 <- (((r*B.data[1,5])+(t*B.data[6,4]))-(B.data[6,5]))/((r-1)*(t-1))
+
+#substitute Y41
+B.data[1,4] <- Y41
+
+#omit previous Yi row and Yj column
+B.data <- B.data[-6, -5]
+
+#compute the rowsums
+B.data$Yj <- c(rowSums(B.data, na.rm = TRUE))
+
+#compute columnsums
+Yi <- c(colSums(B.data, na.rm = TRUE))
+
+#rowbind the results
+B.data <- rbind(B.data, Yi)
+
+#add row index
+rownames(B.data)[nrow(B.data)] <- "Yi"
+
+#view the table and iterated values
+B.data[1,4]
+B.data
+```
+
+The estimated values now remain stable to the 2nd decimal point, thus I stopped the iteration process. My estimated values are:
+
+$$
+Y_{12} = 16.15581 \\
+Y_{34} = 20.15585 \\
+Y_{41} = 18.97403
+$$
+
+## b) Conduct an ANOVA test
+
+**Conduct an analysis of variance (ANOVA) to test whether there are significant differences in the mean growth performance among the four plant varieties and(or) the soil types at the 0.05 significance level, using the completed data-set.**
+
+### 1. State the Null and Alternative Hypotheses
+
+For the ANOVA test, the Null and Alternative Hypotheses for the two sources of variation -- the plant varieties and the soil blocks -- are as follows:
+
+**Null Hypotheses (H₀):**
+
+-   **H₀₁:** There is no significant difference in growth performance among the different plant varieties.
+
+-   **H₀₂:** There is no significant difference in growth performance among the different soil types (blocks).
+
+**Alternative Hypotheses (H₁):**
+
+-   **H₁₁:** There is a significant difference in growth performance among the different plant varieties.
+
+-   **H₁₂:** There is a significant difference in growth performance among the different soil types (blocks).
+
+### 2. Conduct an Anova Test
+
+First I reshaped my data into long format, to be compatible with the `aov()` function.
+
+```{r}
+#omit sum column and row
+B.data2 <- B.data[-6, -5]
+
+#add block variable
+B.data2$block <- seq(1,5)
+
+#view result
+B.data2
+```
+
+```{r}
+# Reshape the data into long format, with "block" as the ID variable
+long_df2 <- melt(B.data2, id.vars = "block")
+
+# Rename columns to appropriate names
+colnames(long_df2) <- c("block", "treatment", "yield")
+
+# View the dataframe
+long_df2
+```
+
+I then ran an ANOVA test of the **crop yield against the treatment** as follows**:**
+
+```{r}
+model3 <- aov(yield ~ treatment, data = long_df2)
+summary(model3)
+```
+
+I then ran an ANOVA test of the **crop yield against the replicates** as follows:
+
+```{r}
+model4 <- aov(yield ~ block, data = long_df2)
+summary(model4)
+```
+
+## c) Interpret the results of the ANOVA and discuss any implications for the study.
+
+### 1. ANOVA test of Crop Yield against Treatments
+
+The p-value associated with the F-statistic is $8.38e^{-05}$, which is much **smaller than the chosen significance level** of 0.05. Thus, **we reject the null hypothesis** that **there is a significant difference in yield among the different treatments**. Thus, different plant varieties are a source of variation in the experiment.
+
+### 2. ANOVA test of Crop yield against Replicates
+
+The p-value associated with the F-statistic is $0.306$, which is **greater than the chosen significance level** of 0.05. Thus **we fail to reject the null hypothesis** that there is a significant difference in crop yield among different soil blocks. Thus, the different soil blocks are not a source of variation in this experiment.
+
+## d) Conduct a post-hoc analysis if necessary
+
+I conducted a **Tukey's HSD test** to test for the specific group differences that are statistically significant among the treatment groups, as the ANOVA test confirmed there are significant differences in crop yield among treatment groups.
+
+### 1. Test of Assumptions
+
+I first tested the data for the assumptions of **Normality**, **Homoscedasticity** and **Independence**.
+
+#### A. Normality
+
+To test for Normality, I used a Shapiro Wilks Test. I set my confidence level at $95\%$, such that if the $p.value > 0.05$, we can assume normality. I conducted this test as follows:
+
+```{r}
+#create dataframe and ensure values are numeric
+B.data3 <- B.data2[,-5]
+B.data3 <- sapply(B.data3, as.numeric)
+
+#view the result
+B.data3
+```
+
+```{r}
+shapiro.test(B.data3)
+```
+
+The p-value of $0.9079$ is **greater than** **the chosen significance level**.Thus, we can assume normality of the data.
+
+#### B. Homoscedasticity
+
+To test for Homoscedasticity using a Levene Test at a $95\%$ confidence level, such that if the $p.value > 0.05$ we can assume homogeneity of variances in the data. I conducted this test as follows:
+
+```{r}
+#library(car)
+#conduct Levene test
+leveneTest(yield~treatment, data = long_df2)
+```
+
+The p-value of $0.8966$ is **greater than the chosen significance level** of $0.05$, thus we can assume homogeneity of variances among the treatment groups.
+
+#### C. Independence
+
+In our Randomized Complete Block Design (RCBD), treatments were randomly assigned to five different soil blocks, ensuring that any differences or variations between the soil blocks are not systematically related to the treatment assignments. This randomization procedure guarantees that the treatments applied to each soil block are independent of each other, satisfying the assumption of independence in our data analysis.
+
+### 2. Conduct Tukey's HSD
+
+```{r}
+# Perform Tukey's HSD test
+tukey_result3 <- TukeyHSD(model3)
+
+# View the results
+tukey_result3
+```
+
+**Interpretation**
+
+-   The comparison between Variety A and Variety B yields a difference of 2.168838 with a p-value of 0.1586013, which is not significant (p \> 0.05).
+
+-   The comparison between Variety A and Variety C yields a difference of 6.000009 with a very small p-value of 0.0000742, indicating a significant difference (p \< 0.05).
+
+-   The comparison between Variety A and Variety D yields a difference of 4.363644 with a p-value of 0.0019447, indicating a significant difference.
+
+-   The comparison between Variety B and Variety C yields a difference of 3.831171 with a p-value of 0.0059014, indicating a significant difference.
+
+-   The comparison between Variety B and Variety D yields a difference of 2.194806 with a p-value of 0.1516020, which is not significant.
+
+-   The comparison between Variety C and Variety D yields a difference of -1.636365 (negative indicating Variety C is lower) with a p-value of 0.3660701, which is not significant.
+
+In summary, Variety A differs significantly from Varieties C and D, and Variety B differs significantly from Variety C. There are no significant differences between Varieties A and B, B and D, and C and D.

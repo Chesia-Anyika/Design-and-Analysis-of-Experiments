@@ -1,0 +1,1090 @@
+---
+title: "STA4020A Midsem Exam"
+author: "Chesia Anyika"
+date: "2024-06-23"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# i. Libraries
+
+```{r}
+# load necessary libraries
+library(nlme)
+library(emmeans)
+library(tidyverse)
+library(multcomp)
+library(car)
+```
+
+# 1. QUESTION 1: [20 MARKS]
+
+Given the field layout and yields in bushels per acre from an experiment on dusting wheat with sulfur to control stem rust, analyze the data using advanced statistical methods. Following a Latin square design, the treatments applied are:
+
+-   A = Dusted before rains
+
+-   B = Dusted after rains
+
+-   C = Dusted once each week
+
+-   D = Drifting once each week
+
+-   E = Control or check
+
+The yields for each treatment are as follows:
+
+|         |          |          |          |          |
+|---------|----------|----------|----------|----------|
+| B (4.9) | D (6.4)  | E (3.3)  | A (9.5)  | C (11.8) |
+| C (9.3) | A (4.0)  | B (6.2)  | E (5.1)  | D (5.4)  |
+| D (7.6) | C (15.4) | A (6.5)  | B (6.0)  | E (4.6)  |
+| E (6.3) | B (7.6)  | C (13.2) | D (8.6)  | A (4.9)  |
+| A (9.3) | E (6.3)  | D (11.8) | C (15.9) | B (7.6)  |
+
+**TASKS**
+
+1\. Evaluate the effects of the different treatments on the wheat yield, considering the potential random effects due to environmental variation.
+
+2\. If statistically necessary, determine which specific treatments significantly differ from each other in terms of yield. Include a visual output to compare the treatments.
+
+3\. Interpret the results in the context of agricultural practices for controlling stem rust, considering both statistical significance and practical implications.
+
+## 1.1 Mixed Effects Model
+
+I used a **Mixed Effects Model** to evaluate the effects of different treatments on the wheat yield, while considering environmental variation as a random effect. A mixed effects model is a statistical model that incorporates both fixed effects, which are consistent and predictable across all observations, and random effects, which account for variability specific to individual subjects or groups; thus it is suitable for this task.
+
+First, I entered the data into r in long format, with the different treatments and yields as column variables.
+
+```{r}
+#create dataframe
+yield_data <- data.frame(
+  treatment = c("B", "D", "E", "A", "C", "C", "A", "B", "E", "D", "D", "C","A", "B", "E", "E", "B", "C", "D", "A", "A", "E", "D", "C", "B"),
+  yield = c(4.9, 6.4, 3.3, 9.5, 11.8, 9.3, 4.0, 6.2, 5.1, 5.4, 7.6, 15.4, 6.5, 6.0, 4.6, 6.3, 7.6, 13.2, 8.6, 4.9, 9.3, 6.3, 11.8, 15.9, 7.6)
+)
+
+#view dataframe
+yield_data
+```
+
+I then created blocking factors for the rows and columns, which will be used in the mixed effects model to account for variability specific to different rows and columns as random effects.
+
+```{r}
+# Create blocking factors for rows and columns
+yield_data$row <- factor(rep(1:5, each = 5))
+yield_data$column <- factor(rep(1:5, 5))
+
+#view results
+yield_data
+```
+
+I then used the `lme()` function to fit a linear mixed effects model, as follows:
+
+```{r}
+#linear mixed effects model
+model <- lme(yield ~ treatment, random = ~ 1 | row/column, data = yield_data)
+
+#summarise the model
+summary(model)
+```
+
+**Interpretation**
+
+The `lme()` function provides three components of output: **fixed and random effects**, **model diagnostics** and **Differences in yield**. The differences in yield is the most important in determining if there are significant differences of yield among treatment groups.
+
+1.  **Fixed and Random Effects**
+
+    The output communicates both the impact of treatments on yield and the extent of variability due to row and column arrangements, helping to understand the sources of variation in the experimental design. The outputs are not important for our analysis.
+
+2.  **Model Diagnostics**
+
+    This includes goodness-of-fit statistics, such as **AIC (Akaike Information Criterion)**, **BIC (Bayesian Information Criterion)**, and **log-likelihood**, which help in comparing and selecting models.
+
+    The AIC and BIC of $106.601$ and $114.5668$ are both applicable in situations of comparing goodness of fit of multiple models, thus do not apply in this case where we only have one model.
+
+    The Log-Likelihood is $-45.30$. This reflects the **maximized value of the likelihood function for the model**, ranging from $-\infty \ \text{to } 0$ , with $0$ representing a perfect fit. The value of $-45.30$ indicates a moderately good fit of the variability within the model to the data, which is acceptable for our purposes.
+
+3.  **Test of differences in yield**
+
+    This output summarizes the **coefficients (Value)**, their **standard errors (Std.Error)**, **degrees of freedom (DF)**, **t-values (t-value)**, and corresponding **p-values (p-value)** from the mixed effects model, testing for differences in yield among trestments.
+
+    -   **(Intercept)**: The intercept represents **Treatment A**, and is the basline tresment for comparison. The value of 6.84 with a very small p-value (0.0000) suggests that **A has a significantly higher estimated yield compared to treatments B, C, D, and E.**
+
+    -   **treatment B**: The coefficient of -0.38 with a p-value of 0.7199 indicates that there is **no significant difference in yield between treatment B and treatment A**, as the coefficient is not significantly different from zero.
+
+    -   **treatment C**: The coefficient of 6.28 with a very small p-value (0.0000) suggests that **treatment C has a significantly higher estimated yield compared to the treatment A**.
+
+    -   **treatment D**: The coefficient of 1.12 with a p-value of 0.2979 indicates that there is **no significant difference in yield between treatment D and the treatment A**.
+
+    -   **treatment E**: The coefficient of -1.72 with a p-value of 0.1180 suggests that **treatment E has a slightly lower estimated yield compared to the treatment A**, but this difference is not statistically significant at the conventional significance level of 0.05.
+
+This output suggests that there are **statistically significant differences in yield between treatment groups**, taking into account fixed and random effects. Specifically, **treatment C has a significantly higher estimated yield as compared to treatment A**.
+
+We can run an ANOVA test on the mixed effects model, to further test for significant differences among treatment groups.
+
+```{r}
+anova(model)
+```
+
+The P-value of $<0.001$ is lower than the conventional significance level of $0.05$. Thus we can formally reject the null hypothesis that there are no significant differences in yield between treatment groups. Thus we conclude that there are **significant differences in yield among treatment groups, accounting for random effects of environmental variation.**
+
+## 1.2 Bonferroni Post-hoc Test
+
+The Bonferroni post-hoc test adjusts the significance level of pairwise comparisons to maintain overall control of the family-wise error rate when multiple comparisons are conducted. The mathematical formula for the Bonferroni correction is:
+
+$$
+\alpha_{\text{adjusted}} = \frac{\alpha}{m}
+$$
+
+> -   $\alpha_{\text{adjusted}}$ is the adjusted significance level for each individual comparison
+>
+> -   $\alpha$ is the desired overall significance level (typically 0.05)
+>
+> -   $m$ is the number of comparisons being made
+
+I chose this test as it **does not assume normality of the data**, as compared to the Tukey's HSD test.
+
+As per the results of the below **Shapiro Wilks Test**, the yield values significantly differ from a normal distribution. The P-value of $0.01987$ is lower than the conventional significance level of $0.05$, thus we reject the null hypothesis that the distribution of the yield values do not significantly differ from a normal distribution.
+
+```{r}
+#create yield vector
+yield <- c(as.numeric(yield_data$yield))
+
+#run shapiro test
+shapiro.test(yield)
+```
+
+For the Bonferroni test, I used the `emmeans()` function from the `emmeans` library, to compute **least square means** of the mixed effects model. I then used the `pairs()` function fromt he same library to perform pairwise comparisons with the Bonferroni correction.
+
+```{r}
+# Obtain estimated marginal means (emmeans)
+emmeans_model <- emmeans(model, ~ treatment)
+
+# Perform pairwise comparisons with Bonferroni adjustment
+bonferroni_results <- pairs(emmeans_model, adjust = "bonferroni")
+summary(bonferroni_results)
+
+
+```
+
+I then plotted a Bar-plot with Error bars to better visualise the results of the Bonferroni test, for ease of interpretation.
+
+```{r}
+# Data from bonferroni_results
+contrast_data <- data.frame(
+  contrast = c("A - B", "A - C", "A - D", "A - E", "B - C", "B - D", "B - E", "C - D", "C - E", "D - E"),
+  estimate = c(0.38, -6.28, -1.12, 1.72, -6.66, -1.50, 1.34, 5.16, 8.00, 2.84),
+  SE = c(1.04, 1.04, 1.04, 1.04, 1.04, 1.04, 1.04, 1.04, 1.04, 1.04)
+)
+
+# Calculate confidence intervals (assuming Bonferroni adjustment)
+contrast_data$lower_CI <- contrast_data$estimate - qt(0.975, 16) * contrast_data$SE
+contrast_data$upper_CI <- contrast_data$estimate + qt(0.975, 16) * contrast_data$SE
+
+# Add a column to identify pairs involving treatment C
+contrast_data$highlight <- ifelse(grepl("C", contrast_data$contrast), "Significant", "Non-Significant")
+
+# Plot with color change for pairs involving treatment C
+ggplot(contrast_data, aes(x = contrast, y = estimate, ymin = lower_CI, ymax = upper_CI, fill = highlight)) +
+  geom_bar(stat = "identity", width = 0.5) +
+  geom_errorbar(width = 0.2) +
+  geom_text(aes(label = sprintf("%.2f", estimate)), vjust = -0.5, hjust = 0.5, size = 4) +
+  scale_fill_manual(values = c("Significant" = "purple", "Non-Significant" = "skyblue")) +  # Color mapping
+  labs(title = "Pairwise Contrasts with Bonferroni Adjustment",
+       x = "Comparison", y = "Estimated Contrast") +
+  theme_minimal()
+```
+
+**Interpretation**
+
+-   Treatment A and B
+
+    B is estimated to have $0.38$ units higher yield than A, which is a small difference. The P-value of $1.00$ is greater than the conventional significance level of $0.05$. Thus we **fail to reject the Null Hypothesis** that there are no significant differences in yield among the two treatments.
+
+-   Treatment A and C
+
+    C is estimated to have $6.28$ units lower yield than A, which is a large difference. The P-value of $0.0002$ is lower than the conventional significance level of $0.05$. Thus we **reject the Null Hypothesis** that there are no significant differences in yield among the two treatments.
+
+-   Treatment A and D
+
+    D is estimated to have $1.12$ units lower yield than A, which is a small difference. The P-value of $1.00$ is greater than the conventional significance level of $0.05$. Thus we **fail to reject the Null Hypothesis** that there are no significant differences in yield among the two treatments.
+
+-   Treatment A and E
+
+    E is estimated to have $1.72$ units higher yield than B, which is a small difference. The P-value of $1.00$ is greater than the conventional significance level of $0.05$. Thus we **fail to reject the Null Hypothesis** that there are no significant differences in yield among the two treatments.
+
+-   Treatment B and C
+
+    C is estimated to have $6.66$ units lower yield than B, which is a large difference. The P-value of $0.0001$ is greater than the conventional significance level of $0.05$. Thus we **reject the Null Hypothesis** that there are no significant differences in yield among the two treatments.
+
+-   Treatment B and D
+
+    D is estimated to have $1.50$ units lower yield than B, which is a small difference. The P-value of $1.00$ is greater than the conventional significance level of $0.05$. Thus we **fail to reject the Null Hypothesis** that there are no significant differences in yield among the two treatments.
+
+-   Treatment B and E
+
+    E is estimated to have $1.34$ units higher yield than B, which is a small difference. The P-value of $1.00$ is greater than the conventional significance level of $0.05$. Thus we **fail to reject the Null Hypothesis** that there are no significant differences in yield among the two treatments.
+
+-   Treatment C and D
+
+    D is estimated to have $5.16$ units higher yield than C, which is a large difference. The P-value of $0.0014$ is greater than the conventional significance level of $0.05$. Thus we **reject the Null Hypothesis** that there are no significant differences in yield among the two treatments.
+
+-   Treatment C and E
+
+    E is estimated to have $8.00$ units higher yield than C, which is a very large difference. The P-value of $<0.0001$ is greater than the conventional significance level of $0.05$. Thus we **reject the Null Hypothesis** that there are no significant differences in yield among the two treatments.
+
+-   Treatment D and E
+
+    E is estimated to have $2.84$ units higher yield than D, which is a small difference. The P-value of $0.14$ is greater than the conventional significance level of $0.05$. Thus we fail to reject the Null Hypothesis that there are no significant differences in yield among the two treatments.
+
+In Conclusion, the treatment pairs A and C, B and C, C and Das well as C and E have **significant differences among pairwise estimates**. Thus **each treatment group differs with treatment group C**. Treatment group C consistently has significantly lower yield estimates than each pairwise group, suggesting that treatment C (dusting wheat with sulfur once each week) is not a suitable treatment for maximising yield.
+
+## 1.3 Practical Implications
+
+-   Treatment C consistently shows significantly lower yields compared to other treatments (A, B, D, E). This suggests that dusting wheat with sulfur once each week (Treatment C) may not be effective in maximizing yield compared to other treatments. Thus, farmers should opt out of using Treatment C to control stem rust.
+
+-   Treatments A, B, D and E show yields that do not significantly differ among the treatment groups, thus dusting before rains, dusting after rains, drifting once a week, and the control group do not result in similar yield outputs. Thus, there is no benefit or loss in using either four methods for controlling stem rust. Thus, farmers and agricultural practitioners should consider the practical feasibility and cost-effectiveness of implementing these treatments rather than gains or losses in yield.
+
+-   The inclusion of random effects (rows and columns) in the model accounts for environmental variability, enhancing the robustness of the findings. This ensures that the differences observed among treatments are not solely due to environmental factors but are statistically supported.
+
+# 2. QUESTION 2: [20 MARKS]
+
+In a digestion trial carried out with 6 shorthorn steers, each animal received one of 6 rations in 6 successive periods following a Latin square design. The rations consist of:
+
+-   A: Hay alone
+
+-   B: Various mixtures of hay and barley (Rations B, C, D, E, F)
+
+The coefficients of digestibility of nitrogen for each steer and period are as follows:
+
+| **Steer** | Period 1 | Period 2 | Period 3 | Period 4 | Period 5 | Period 6 |
+|-----------|----------|----------|----------|----------|----------|----------|
+| **1**     | 61.1 (B) | 69.3 (D) | 67.6 (C) | 61.9 (F) | 58.8 (A) | 65.2 (E) |
+| **2**     | 56.9 (A) | 59.1 (F) | 64.0 (D) | 61.0 (C) | 65.7 (E) | 56.6 (B) |
+| **3**     | 66.5 (C) | 62.2 (A) | 61.1 (B) | 66.2 (E) | 62.0 (F) | 62.2 (D) |
+| **4**     | 66.7 (E) | 67.4 (B) | 65.1 (F) | 65.1 (D) | 69.6 (C) | 52.7 (A) |
+| **5**     | 67.8 (D) | 64.7 (C) | 63.6 (E) | 53.2 (A) | 61.7 (B) | 62.0 (F) |
+| **6**     | 71.4 (F) | 67.5 (E) | 55.8 (A) | 63.2 (B) | 68.0 (D) | 62.9 (C) |
+
+**TASKS**
+
+1\. Assess the effects of different rations on the digestibility of nitrogen. Include an analysis of variance (ANOVA) to test the significance of the ration effects, period effects, and steer effects.
+
+2\. Where necessary, identify which specific rations differ significantly from each other in terms of digestibility. Include a visual output to compare the treatments.
+
+3\. Discuss the implications of your findings for nutritional strategies in cattle farming, highlighting any potential benefits or drawbacks of specific rations based on the digestibility results.
+
+## 2.1 ANOVA Test
+
+### 2.1.1 Row and Column Totals
+
+First, i input the above table into r
+
+```{r}
+#create vectors
+Steer <- seq(1,6)
+Period_1 <- c(61.1, 56.9, 66.5, 66.7, 67.8, 71.4)
+Period_2 <- c(69.3, 59.1, 62.2, 67.4, 64.7, 67.5)
+Period_3 <- c(67.6, 64.0, 61.1, 65.1, 63.6, 55.8)
+Period_4 <- c(61.9, 61.0, 66.2, 65.1, 53.2, 63.2)
+Period_5 <- c(58.8, 65.7, 62.0, 69.6, 61.7, 68.0)
+Period_6 <- c(65.2, 56.6, 62.2, 52.7, 62.0, 62.9)
+
+# create table
+Steer_data <- data.frame(Steer, Period_1, Period_2, Period_3, Period_4, Period_5, Period_6)
+
+#set Field as index and remove column
+rownames(Steer_data) <- Steer_data$Steer
+Steer_data <- Steer_data[, -which(names(Steer_data) == "Steer")]
+Steer_data_extra <- Steer_data
+
+# view the table
+Steer_data
+```
+
+To construct the ANOVA table, I need the **Row, Column, Treatment, Error and Total Sum of Squares**, their respective **Degrees of Freedom**, **Mean Squares** and **F-Statistic Values**
+
+To compute these, we need the **Column Totals (** $Y_{i.}$ **), Row Totals (** $Y_{.j}$ **)**, **Experimental Totals (** $Y..$ **)** and the **Sum of Squares of Individual Observations (** $\sum Y_{ij}^2$ **)**.
+
+I computed the **Row totals** by getting the sum of the observations row-wise, and created a new column in the table as follows:
+
+```{r}
+#compute the rowsums
+Steer_data$Row.sum <- c(rowSums(Steer_data))
+
+#view the table
+Steer_data[ncol(Steer_data)]
+```
+
+To compute the **Column Totals**, I computed the sums of the observations column-wise. I then created a new row of Treatment Totals as follows:
+
+```{r}
+#compute columnsums
+Col.sum <- c(colSums(Steer_data))
+
+#rowbind the results
+Steer_data <- rbind(Steer_data, Col.sum)
+
+#add row index
+rownames(Steer_data)[nrow(Steer_data)] <- "Col.sum"
+
+#view result
+Steer_data
+```
+
+The value at the intersection of the columna nd row totals is the **Experiment Total (** $Y..$ **)**, and it is $2275.8$.
+
+For the **Sum of Squares of Individual Observations (** $\sum Y^2_{ij}$ **)**, I computed this for each column and added a row of the results to the table as follows:
+
+```{r}
+#subset the relevant rows
+subset_df <- Steer_data[1:6, 1:6]
+
+#compute the sums
+Yij.sq.sum <- c(colSums(subset_df^2))
+
+#view results
+Yij.sq.sum
+```
+
+```{r}
+#transfer results to named vector
+Yij.sq.sum <-c(25536.76, 25449.24, 23795.58, 22997.54, 24892.98, 21901.14)
+
+#get sum
+Yij.sq.sum <- c(Yij.sq.sum, sum(Yij.sq.sum))
+
+#view results
+Yij.sq.sum
+```
+
+```{r}
+#add resulting vector to dataframe
+Steer_data <- rbind(Steer_data, Yij.sq.sum)
+
+#add row index
+rownames(Steer_data)[nrow(Steer_data)] <- "SS"
+
+#view results
+Steer_data
+```
+
+I then computed the **Treatment totals** ( $Yi.$ ) as follows:
+
+```{r}
+#create treatments vector
+Treatments <- c('B', 'A', 'C', 'E', 'D', 'F', 'D', 'F', 'A', 'B', 'C', 'E', 'C', 'D', 'B', 'F', 'E', 'A', 'F', 'C', 'E', 'D', 'A', 'B', 'A', 'E', 'F', 'C', 'B', 'D', 'E', 'B', 'D', 'A', 'F', 'C')
+
+#create periods vector
+Periods <- as.numeric(c(Period_1, Period_2, Period_3, Period_4, Period_5, Period_6))
+
+#merge into dataframe
+Steer_data2 <- data.frame(Treatments, Periods)
+
+#view result
+Steer_data2
+```
+
+I then used `dplyr` to summarise the sum of periods for each treatment:
+
+```{r}
+# Use dplyr to summarize the sum of periods for each treatment
+summary <- Steer_data2 %>%
+  group_by(Treatments) %>%
+  summarise(Trt_Totals = sum(Periods))
+
+#view result
+summary
+```
+
+With these computed parameters, we can now compute the **Correction Factor**, as well as the required Sums of Squares and Mean Squares for the ANOVA table.
+
+### 2.1.2 Correction Factor
+
+The Correction Factor is computed as per the following formula:
+
+$$
+CF = \frac{(Y..)^2}{r^2}
+$$
+
+> Where:
+>
+> $Y..$ is the square of the Experiment Totals.
+>
+> $r$ is the number of rows
+
+I computed this as follows:
+
+```{r}
+#define number of treatment
+r <- 6
+
+#compute Correction Factor
+CF <- ((Steer_data[7,7])^2)/(r^2)
+
+#View results
+CF
+```
+
+The **Correction Factor** is $143868.5$.
+
+### 2.1.3 Sum of Squares (SS)
+
+**A. Total Sum of Squares (TSS)**
+
+The Total SS is computed as per the formula:
+
+$$
+TSS = \sum Y^2_{ij} - CF
+$$
+
+> Where:
+>
+> $Y^2_{ij}$ is the Sum of Squares of all observations.
+>
+> $CF$ is the Correction Factor
+
+I computed this as follows:
+
+```{r}
+#compute the Total SS
+TSS <- (sum(Steer_data[8,7]))- CF
+
+#View the results
+TSS
+```
+
+The **Total SS** is $704.75$
+
+**B. Row Sum of Squares (Row SS)**
+
+The Row SS is computed as per the following formula:
+
+$$
+Row\ SS = \frac{\sum Row^2}{r} - CF
+$$
+
+> Where:
+>
+> $Y_{.j}^2$ is the **Sum of Squares of Row Totals**
+>
+> $r$ is the number of row
+>
+> $CF$ is the Correction Factor
+
+I computed this as follows:
+
+```{r}
+#Compute the Row SS
+Row.SS <- ((sum(Steer_data[1:6,7]^2))/r) - CF
+
+#View the results
+Row.SS
+```
+
+The **Row SS** is $76.8667$
+
+**C. Column Sum of Squares (Col SS)**
+
+The Column SS is computed as per the formula:
+
+$$
+Col\ SS =  \frac{\sum Col^2}{r} - CF 
+$$
+
+> Where:
+>
+> $Y_{i.}^2$ is the **Sum of Squares of the Column Totals**.
+>
+> $r$ is the number of row.
+>
+> $CF$ is the Correction Factor
+
+I computed this as follows:
+
+```{r}
+#Compute the Column SS
+Col.SS <- ((sum(Steer_data[7, 1:6]^2))/r) - CF
+
+#View the results
+Col.SS
+```
+
+The **Column SS** is $112.9433$
+
+**D. Treatment Sum of Squares (Trt SS)**
+
+The Treatment SS is computed as per the following formula:
+
+$$
+Trt\ SS = \frac{\sum Yi.^2}{r} - CF
+$$
+
+```{r}
+#Compute Treatment SS
+Trt.SS <- ((sum(summary$Trt_Totals^2))/r) - CF
+
+#view result
+Trt.SS
+```
+
+The **Treatment SS** is $392.1567$.
+
+**E. Error Sum of Squares (Err SS)**
+
+The Error SS is computed as per the following formula:
+
+$$
+Err\ SS = TSS - Row\ SS - Col\ SS -Trt\ SS
+$$
+
+> Where:
+>
+> $TSS$ is the Total Sum of Squares.
+>
+> $Row\ SS$ is the Row Sum of Squares.
+>
+> $Col\ SS$ is the Column Sum of Squares
+>
+> $Trt\ SS$ is the Treatment Sum of Squares.
+
+I computed this as follows:
+
+```{r}
+#Compute the Error SS
+Err.SS <- TSS - Row.SS - Col.SS - Trt.SS
+
+#View the results
+Err.SS
+```
+
+The **Error SS** is $122.7833$
+
+### 2.1.4 Mean Squares (MS)
+
+**A. Row Mean Squares (Row MS)**
+
+The Row MS is computes as follows:
+
+$$
+Row\ MS = \frac{Row\ SS}{r-1} 
+$$
+
+> Where:
+>
+> $Row\ SS$ is the Row Sum of Squares
+>
+> $r$ is the number of rows
+>
+> $r-1$ represents the **Rows** **Degrees of Freedom.**
+
+I computed this as follows:
+
+```{r}
+#define Row DF
+df.row <- r-1
+
+#compute the Row MS
+Row.MS <- Row.SS/(df.row)
+
+#View results
+Row.MS
+```
+
+The **Row MS** is $15.37333$
+
+**B. Column Mean Squares**
+
+The Column MS is computed as per the formula:
+
+$$
+Col\ SS = \frac{Col\ SS}{r-1}
+$$
+
+> Where:
+>
+> $Col\ SS$ is the Column Sum of Squares
+>
+> $r$ is the number of rows
+>
+> $r-1$ is the **Columns Degrees of freedom**
+
+I computed this as follows:
+
+```{r}
+#define column DF
+df.col <- r-1
+
+#compute the column MS
+Col.MS <- Col.SS/(df.col)
+
+#View results
+Col.MS
+```
+
+The **Column SS** is $22.58867$.
+
+**C. Treatment Mean Squares (Trt MS)**
+
+The Treatment MS is computed as per the formula:
+
+$$
+Trt\ MS = \frac{Trt\ SS}{r-1}
+$$
+
+> Where:
+>
+> $Trt\ SS$ is the Treatment Sum of Squares.
+>
+> $r$ is the number of rows
+>
+> $r-1$ represents the **Treatment Degrees of Freedom**
+
+I computed this as follows:
+
+```{r}
+#define the Treatment Df
+df.trt <- r-1
+
+#compute the Treatment MS
+Trt.MS <- Trt.SS/df.trt
+
+#view the results
+Trt.MS
+```
+
+The **Treatment MS** is $78.43133$.
+
+**D. Error Mean Squares (Err MS)**
+
+The Error MS is computed as per the following formula:
+
+$$
+Error\ MS = \frac{Err\ SS}{(r-1)(r-2)} 
+$$
+
+> Where
+>
+> $Err\ SS$ is the Error Sum of Squares
+>
+> $r$ is the number of replicates
+>
+> $(r-1)(r-2)$ represents the **Error Degrees of Freedom**
+
+I computed this as follows:
+
+```{r}
+#define the Error Df
+df.err <- (r-1)*(r-2)
+
+#compute the Error mean squares
+Err.MS <- Err.SS/df.err
+
+#View results
+Err.MS
+```
+
+The **Error MS** is $6.139167$
+
+### 2.1.5 Degrees of Freedom (DF)
+
+The **Row, Column, Treatment and Error Degrees of Freedom** have been calculated with the Mean Squares. They are as follows:
+
+```{r}
+#View the Degrees of Freedom
+cat('\n Row DF: ', df.row,
+    '\n Column DF', df.col,
+    '\n Treatment DF: ', df.trt,
+    '\n Error DF: ', df.err)
+```
+
+The **Total Degrees of Freedom** are computed as per the formula:
+
+$$
+TDF= r^2-1
+$$
+
+I computed this as follows:
+
+```{r}
+#compute the Total DF
+df.t <- (r^2)-1
+
+#view the results
+df.t
+```
+
+The **Total Degrees of Freedom** are $35$.
+
+### 2.1.6 F-Statistics
+
+**A. Row F-Statistic**
+
+The Row F-Statistic is computed as per the formula:
+
+$$
+F_{row} = \frac{Row\ MS}{Err\ MS}
+$$
+
+> Where:
+>
+> $Row\ MS$ is the Row Mean Squares.
+>
+> $Err MS$ is the Error Mean Squares.
+
+I computed this as follows:
+
+```{r}
+#compute the row Fstat
+F.row <- Row.MS/Err.MS
+
+#Voew the result
+F.row
+```
+
+The **Row F-Statistic** is $2.50414$.
+
+**B. Column F-Statistic**
+
+The Column F-Statistic is computed as per the formula:
+
+$$
+F_{Col} = \frac{Col\ MS}{Err\ MS}
+$$
+
+I computed this as follows:
+
+```{r}
+#Compute column Fstat
+F.col <- Col.MS/Err.MS
+
+#View the result
+F.col
+```
+
+The **Column F-Statistic** is $3.6794$.
+
+**B. Treatment F-Statistic**
+
+The Treatment F-Statistic is computed as per the formula:
+
+$$
+F_{trt} = \frac{Trt\ MS}{Err\ MS} 
+$$
+
+I computed this as follows:
+
+```{r}
+#compute the Treatment Fstat
+F.trt <- Trt.MS/Err.MS
+
+#View the result
+F.trt
+```
+
+The **Treatment F-Statistic** is $12.7756$.
+
+With these computed parameters we can now construct the **ANOVA Table**.
+
+### 2.1.7 ANOVA Table
+
+I constructed the ANOVA Table as follows:
+
+```{r}
+#construct the anova table
+anova_table <- data.frame(
+  SOV = c("Row","Column","Treatment", "Error", "Total"), #SOV stands fo Sources of Variation
+  Df = c(df.row, df.col, df.trt, df.err, df.t),
+  SS = c(Row.SS, Col.SS, Trt.SS, Err.SS, TSS),
+  MS = c(Row.MS, Col.MS, Trt.MS, Err.MS, NA),  # MS for Total is not applicable
+  F = c(F.row,F.col, F.trt, NA, NA)  # F for Error and Total is not applicable
+)
+
+#View the result
+anova_table
+```
+
+### **2.1.8 Interpretation**
+
+To interpret the results of the ANOVA table, I compared the computed F-statistic values for the Treatments and the Replicates to the F-Statistics from the **F-distribution table**. This will determine whether we can **reject or fail to reject the previously defined Null hypotheses for the Rows, Columns and Treatments.**
+
+I used the `qf()` function to compute the F-distribution value for the Treatment, at a $95\%$ confidence level, as follows:
+
+```{r}
+#define the alpha levels
+alpha05 <- 0.05
+
+#compute F-values
+##95% significance
+F.Trt05 <- qf(1-alpha05, df.trt, df.err)
+
+
+#View results
+cat('\n F.Trt05: ', F.Trt05)
+```
+
+The computed F-value is as follows:
+
+$$
+\textbf{Treatment F-values}\\
+F_{0.5;5;20} = 2.71089 \\
+$$
+
+I compared this values to the ANOVA Table, such that is the **ANOVA F-values are greater than the F-distribution table values**, we will **reject the Null Hypothesis** that there is no significant difference in the digestibility of nitrogen.
+
+I used an **if statement** to compare the Row F-values as follows:
+
+```{r}
+# Test hypothesis for Row F-value - 95% sig 
+if (F.row > F.Trt05) {
+  cat("\n F_value: ", F.row, "\n Critical Value: ", F.Trt05, "\n ", "\n Null hypothesis rejected")
+} else {
+  cat("\n F_value: ", F.row, "\n Critical Value: ", F.Trt05, "\n ", "\n Fail to reject null hypothesis")
+}
+```
+
+We **Fail to reject the Null Hypothesis** at a $95\%$ Confidence Level. Thus, There are no significant difference in mean digestibility of nitrogen among the different steers.
+
+I similarly compared the Column F-Values as follows:
+
+```{r}
+# Test hypothesis for Column F-value - 95% sig 
+if (F.col > F.Trt05) {
+  cat("\n F_value: ", F.col, "\n Critical Value: ", F.Trt05, "\n ", "\n Null hypothesis rejected")
+} else {
+  cat("\n F_value: ", F.col, "\n Critical Value: ", F.Trt05, "\n ", "\n Fail to reject null hypothesis")
+}
+```
+
+We **reject the Null Hypothesis** at a $95\%$ confidence level. Thus there are significant differences in mean digestibility of nitrogen among different periods.
+
+I similarly compared the Treatment F-values as follows:
+
+```{r}
+# Test hypothesis for Treatment F-value - 95% sig 
+if (F.trt > F.Trt05) {
+  cat("\n F_value: ", F.trt, "\n Critical Value: ", F.Trt05, "\n ", "\n Null hypothesis rejected")
+} else {
+  cat("\n F_value: ", F.trt, "\n Critical Value: ", F.Trt05, "\n ", "\n Fail to reject null hypothesis")
+}
+```
+
+The **Null Hypothesis is Rejected** at a $95\%$ confidence level. Thus, there are significant differences in the mean digestibility of nitrogen among different rations.
+
+## 2.2 Post-hoc
+
+I chose the **Tukey's HSD (Honestly Significant Difference) Test**, which is a post-hoc analysis which controls for type I error (false positives, when a statistical test incorrectly rejects an true Null Hypothesis). The test measures the least amount that means must vary to be truly different.
+
+### 2.2.1 Test of Assumptions
+
+The Tukey's HSD test makes three assumptions about the data tested, which are:
+
+-   **Normality** - The test assumes the population from which samples are drawn is normally distributed.
+
+-   **Homoscedasticity** - The test assumes the variances within each group should be approximately equal.
+
+-   **Independence** - The test assumes observations are independent of each other.
+
+**A. Normality**
+
+To test for **Normality**, I used a **Shapiro WIlks Test**. I set my confidence level at $95\%$, such that if the $p.value > 0.05$, we can assume normality. I conducted this test as follows:
+
+```{r}
+#conduct shapiro test
+shapiro.test(Steer_data2$Periods)
+```
+
+The p-value of $0.3083$ is **greater than** the significance level of $0.05$. Thus, we can assume normality of the data.
+
+**B. Homoscedasticity**
+
+To test for **Homoscedasticity** using a **Levene Test** at a $95\%$ confidence level, such that if the $p.value > 0.05$ we can assume homogeneity of variances in the data. I conducted this test as follows:
+
+```{r}
+# Reset row names to a column
+Steer_data_extra <- Steer_data_extra %>%
+  rownames_to_column(var = "Steer")
+
+# Pivot the data longer
+melted_data <- Steer_data_extra %>%
+  pivot_longer(cols = starts_with("Period"), names_to = "Period", values_to = "Value")
+
+#view result
+melted_data
+```
+
+```{r}
+#library(car)
+#conduct Levene test for Treatments
+leveneTest(Periods~Treatments, data = Steer_data2) 
+
+#Conduct Levene Test for Periods
+leveneTest(Value~Period, data = melted_data)
+```
+
+For the Treatments, The p-value of $0.7678$ is **greater than** the significance level of $0.05$. Thus, we can assume homoscedasticity of the data.
+
+For the Periods, The p-value of $0.9969$ is **greater than** the significance level of $0.05$. Thus, we can assume homoscedasticity of the data.
+
+**C. Independence**
+
+Latin Square Design ensures independence of observations by arranging treatments in such a way that each treatment appears exactly once in each row and column, thereby controlling for potential confounding variables in both dimensions. This structure minimizes the effects of row and column factors, isolating the treatment effects and reducing the risk of correlated errors.
+
+**All the assumptions are met**, Thus we can proceed with the Tukey's HSD test.
+
+### 2.2.2 Conduct Tukey's HSD Test
+
+#### **A. Comparing Treatment Groups**
+
+I conducted a Tukey's test to compare differences between treatment groups, as follows:
+
+```{r}
+# Fit ANOVA model
+model1 <- aov(Periods ~ Treatments, data = Steer_data2)
+
+# Perform Tukey's HSD test
+tukey_result1 <- TukeyHSD(model1)
+
+# View the results
+tukey_result1
+
+```
+
+I then created a **Scatterplot with error bars** to visualise the above output, and better interprate it. The purple points indicate a significant difference among treatment groups, while the black points indicate a non-significant difference among treatment groups.
+
+```{r}
+# Convert Tukey's HSD results to a data frame
+tukey_results <- as.data.frame(tukey_result1$Treatments)
+tukey_results$comparison <- rownames(tukey_results)
+
+# Add a column to indicate significance using ifelse
+tukey_results$significant <- ifelse(tukey_results$`p adj` < 0.05, "Significant", "Not Significant")
+
+# Create the plot
+ggplot(tukey_results, aes(x = comparison, y = diff, color = significant)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.2) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_text(aes(label = round(diff, 2)), vjust = -0.5, color = "black") +
+  scale_color_manual(values = c("Significant" = "purple", "Not Significant" = "black"),
+                     guide = guide_legend(title = "Significance")) +  # Add legend title
+  theme_minimal() +
+  labs(title = "Tukey's HSD Results",
+       x = "Treatment Comparisons",
+       y = "Difference in Means") +
+  coord_flip() +
+  theme(legend.position = "right")  # Adjust legend position
+
+
+```
+
+**Interpretation**
+
+1\. **B - A**: The difference is $5.25$, with Treatment B having higher digestibility of nitrogen than Treatment A. The p-value is $0.0820$. We **fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Treatments A and B.
+
+2\. **C - A**: The difference is $8.78$, with Treatment C having higher digestibility of nitrogen than Treatment A. The p-value is $0.0007$. We **reject the null hypothesis**, indicating a significant difference in nitrogen digestibility between Treatments A and C.
+
+3\. **D - A**: The difference is $9.47$, with Treatment D having higher digestibility of nitrogen than Treatment A. The p-value is $0.0002$. We **reject the null hypothesis**, indicating a significant difference in nitrogen digestibility between Treatments A and D.
+
+4\. **E - A**: The difference is $9.22$, with Treatment E having higher digestibility of nitrogen than Treatment A. The p-value is $0.0004$. We **reject the null hypothesis**, indicating a significant difference in nitrogen digestibility between Treatments A and E.
+
+5\. **F - A**: The difference is $6.98$, with Treatment F having higher digestibility of nitrogen than Treatment A. The p-value is $0.0090$. We **reject the null hypothesis,** indicating a significant difference in nitrogen digestibility between Treatments A and F.
+
+6\. **C - B**: The difference is $3.53$, with Treatment C having higher digestibility of nitrogen than Treatment B. The p-value is $0.4240$. We **fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Treatments B and C.
+
+7\. **D - B**: The difference is $4.22$, with Treatment D having higher digestibility of nitrogen than Treatment B. The p-value is $0.2406.$ We **fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Treatments B and D.
+
+8\. **E - B**: The difference is $3.97$, with Treatment E having higher digestibility of nitrogen than Treatment B. The p-value is $0.3005$. We **fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Treatments B and E.
+
+9\. **F - B**: The difference is $1.73$, with Treatment B having higher digestibility of nitrogen than Treatment F. The p-value is $0.9355$. We **fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Treatments B and F.
+
+10\. **D - C**: The difference is $0.68$, with Treatment D having higher digestibility of nitrogen than Treatment C. The p-value is $0.9990$. We **fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Treatments C and D.
+
+11\. **E - C**: The difference is $0.43$, with Treatment E having higher digestibility of nitrogen than Treatment C. The p-value is $0.9999$. We **fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Treatments C and E.
+
+12\. **F - C**: The difference is $-1.80$, with Treatment C having higher digestibility of nitrogen than Treatment F. The p-value is $0.9251$. We **fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Treatments C and F.
+
+13\. **E - D**: The difference is $-0.25$, with Treatment D having higher digestibility of nitrogen than Treatment E. The p-value is $0.9999.$ We **fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Treatments D and E.
+
+14\. **F - D**: The difference is $-2.48$, with Treatment D having higher digestibility of nitrogen than Treatment F. The p-value is $0.7650$. We **fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Treatments D and F.
+
+15\. **F - E**: The difference is $-2.23$, with Treatment E having higher digestibility of nitrogen than Treatment F. The p-value is $0.8341$. We **fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Treatments E and F.
+
+In summary, Treatments C, D, E, and F have honestly **significantly higher nitrogen digestibility compared to Treatment A**, while there are no significant differences among other pairs of treatments.
+
+#### **B. Comparing Periods**
+
+I conducted a Tukey's test to compare differences among Periods.
+
+```{r}
+# Fit ANOVA model
+model2 <- aov(Value ~ Period, data = melted_data)
+
+# Perform Tukey's HSD test
+tukey_result2 <- TukeyHSD(model2)
+
+# View the results
+tukey_result2
+```
+
+I then created a **scatterplot with error bars** to visualise the result above, for better interpretation. The purple points indicate significant differences, while the black points indicate non significant differences.
+
+```{r}
+# Convert Tukey's HSD results to a data frame
+tukey_results_df <- as.data.frame(tukey_result2$Period)
+tukey_results_df$comparison <- rownames(tukey_results_df)
+
+# Add a column to indicate significance using ifelse
+tukey_results_df$significant <- ifelse(tukey_results_df$`p adj` < 0.05, "Significant", "Not Significant")
+
+# Create the plot using ggplot2
+library(ggplot2)
+
+ggplot(tukey_results_df, aes(x = comparison, y = diff, color = significant)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.2) +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  geom_text(aes(label = round(diff, 2)), vjust = -0.5, color = "black") +
+  scale_color_manual(values = c("Significant" = "purple", "Not Significant" = "black"),
+                     guide = guide_legend(title = "Significance")) +  # Add legend title
+  theme_minimal() +
+  labs(title = "Tukey's HSD Results",
+       x = "Period Comparisons",
+       y = "Difference in Means") +
+  coord_flip() +
+  theme(legend.position = "right")  # Adjust legend text size
+
+
+```
+
+**Interpretation**
+
+1.  **Period 2 - Period 1**: The difference is $-0.0333$, with Period 1 having slightly higher digestibility of nitrogen than Period 2. The p-value is $1.0000$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 1 and 2.
+2.  **Period 3 - Period 1**: The difference is $-2.2000$, with Period 1 having higher digestibility of nitrogen than Period 3. The p-value is $0.9535$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 1 and 3.
+3.  **Period 4 - Period 1**: The difference is $-3.3000$, with Period 1 having higher digestibility of nitrogen than Period 4. The p-value is $0.7897$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 1 and 4.
+4.  **Period 5 - Period 1**: The difference is $-0.7667$, with Period 1 having higher digestibility of nitrogen than Period 5. The p-value is $0.9996$. **We fail to reject the null hypothesi**s, indicating no significant difference in nitrogen digestibility between Periods 1 and 5.
+5.  **Period 6 - Period 1**: The difference is $-4.8000$, with Period 1 having higher digestibility of nitrogen than Period 6. The p-value is $0.4380$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 1 and 6.
+6.  **Period 3 - Period 2**: The difference is $-2.1667$, with Period 2 having higher digestibility of nitrogen than Period 3. The p-value is $0.9564$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 2 and 3.
+7.  **Period 4 - Period 2**: The difference is $-3.2667$, with Period 2 having higher digestibility of nitrogen than Period 4. The p-value is $0.7965$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 2 and 4.
+8.  **Period 5 - Period 2**: The difference is $-0.7333$, with Period 2 having higher digestibility of nitrogen than Period 5. The p-value is $0.9997$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 2 and 5.
+9.  **Period 6 - Period 2**: The difference is $-4.7667$, with Period 2 having higher digestibility of nitrogen than Period 6. The p-value is $0.4457$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 2 and 6.
+10. **Period 4 - Period 3**: The difference is $-1.1000$, with Period 3 having higher digestibility of nitrogen than Period 4. The p-value is $0.9980$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 3 and 4.
+11. **Period 5 - Period 3**: The difference is $1.4333,$ with Period 5 having higher digestibility of nitrogen than Period 3. The p-value is $0.9929$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 3 and 5.
+12. **Period 6 - Period 3**: The difference is $-2.6000$, with Period 3 having higher digestibility of nitrogen than Period 6. The p-value is $0.9096$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 3 and 6.
+13. **Period 5 - Period 4**: The difference is $2.5333$, with Period 5 having higher digestibility of nitrogen than Period 4. The p-value is $0.9182$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 4 and 5.
+14. **Period 6 - Period 4**: The difference is $-1.5000$, with Period 4 having higher digestibility of nitrogen than Period 6. The p-value is $0.9913.$ **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 4 and 6.
+15. **Period 6 - Period 5**: The difference is $-4.0333$, with Period 5 having higher digestibility of nitrogen than Period 6. The p-value is $0.6218$. **We fail to reject the null hypothesis**, indicating no significant difference in nitrogen digestibility between Periods 5 and 6.
+
+In summary, **for all pairs, we fail to reject the null hypothesis**, indicating no honestly significant differences in nitrogen digestibility among any of the periods.
+
+## 2.3 Practical Implications
+
+-   Treatments C,D,E and F have **Honestly significant differences in digestibility of nitrogen among steers** as compared to treatment A. Thus, feeding the steers Hay alone (treatment A) significantly differs from feeding them mixtures of hay and barley in the ratios C, D, E and F.
+
+-   In all pairs of the four hay and barley mixtures with A, treatments C, D, E and F had higher coefficients of digestibility of nitrogen than treatment A. Thus, **feeding the steers a mixture of hay and barley in the ratios of C, D, E, and F is more beneficial to the digestibility of nitrogen** than feeding them hay alone, as in treatment A.
+
+-   There is no benefit or drawback in feeding the steers the different ratios B, C, D, E and F of barley mixed with hay, as there are **no statistically significant differences in the pairwise comparisons among these groups**.
+
+-   There are no benefits or drawbacks in terms of different steers and different feeding periods when it comes to the digestibility of nitrogen, as **neither had statistically significant differences among pairwise comaprisons.**
